@@ -1,5 +1,7 @@
 import { asc } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+import { router } from 'expo-router';
+import { ChevronRight } from 'lucide-react-native';
 import { SectionList, StyleSheet } from 'react-native';
 
 import { AppText } from '@/components/app-text';
@@ -10,8 +12,8 @@ import { categories } from '@/db/enums';
 import { categoryLabels, schemeLabels } from '@/lib/labels';
 import { categoryColors, space, useTheme } from '@/theme';
 
-// First pass: the seeded library grouped by category. Search, filters,
-// favourites and the detail screen come with the Library step.
+// First pass: the seeded library grouped by category. Search, filters and
+// favourites come with the Library step.
 export default function LibraryScreen() {
   const { colors } = useTheme();
   const { data } = useLiveQuery(
@@ -43,6 +45,8 @@ export default function LibraryScreen() {
             title={item.name}
             subtitle={schemeLabels[item.dosageScheme]}
             dotColor={categoryColors[item.category]}
+            right={<ChevronRight size={20} strokeWidth={1.75} color={colors.textTertiary} />}
+            onPress={() => router.push({ pathname: '/exercise/[exerciseId]', params: { exerciseId: item.id } })}
           />
         )}
         style={{ backgroundColor: colors.bg }}

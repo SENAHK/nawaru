@@ -4,16 +4,10 @@ import { Settings } from 'lucide-react-native';
 import { EmptyState } from '@/components/empty-state';
 import { IconButton } from '@/components/icon-button';
 import { Screen } from '@/components/screen';
-
-const dateFormat = new Intl.DateTimeFormat('en-GB', {
-  weekday: 'short',
-  day: 'numeric',
-  month: 'short',
-});
+import { formatDate } from '@/lib/format';
 
 export default function TodayScreen() {
-  // "Mon 12 Jan" (design-system.md §10)
-  const title = dateFormat.format(new Date()).replace(',', '');
+  const title = formatDate(new Date());
 
   return (
     <Screen
