@@ -222,6 +222,8 @@ Règles :
 | `exercise_id` | fk | |
 | `prescription_id` | fk nullable | Null = exercice ajouté librement |
 | `sort` | int | |
+| Dosage (mêmes colonnes que `prescription`, §7) | | Dosage visé pour ce log : copié de la prescription, ou saisi pour un exercice libre. Figé ici, pour qu'une modification ultérieure du programme ne change jamais un log |
+| `target_load_kg` | real nullable | Charge visée, résolue depuis la prescription |
 | `grip_type`, `finger_count`, `side`, `edge_mm`, `support_label` | | Valeurs réellement utilisées |
 | `effort_scale`, `effort_value` | | Effort global de l'exercice |
 | `notes` | text | |

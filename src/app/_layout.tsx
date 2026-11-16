@@ -16,6 +16,7 @@ import { useEffect } from 'react';
 import { EmptyState } from '@/components/empty-state';
 import { Screen } from '@/components/screen';
 import { DatabaseGate } from '@/db/provider';
+import { restoreSession } from '@/features/timer/store';
 import { AppThemeProvider, typography, useTheme } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -57,6 +58,8 @@ function DatabaseError({ error }: { error: Error }) {
 
 function RootNavigator() {
   useHideSplash();
+  // Brings back a timer that was running when the app was closed.
+  useEffect(() => restoreSession(), []);
   const { colors, scheme } = useTheme();
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
   const navigationTheme = {

@@ -151,8 +151,8 @@ Modal plein écran. Le timer et le log partagent **un seul écran** : le timer e
 | --- | --- | --- |
 | Barre haute | Bouton fermer (`chevron-down`), phase (`GET READY`, `HANG`, `OFF`, `REST`, `SWITCH`, `DONE`), bouton son (`volume-2` / `volume-x`) | `title2`, couleur de texte de la phase |
 | Côté (si unilatéral) | `LEFT` ou `RIGHT` avec une flèche, à gauche du décompte | `displayM` |
-| Décompte | Temps restant (`7`, `2:41`), ou chrono montant pour une étape manuelle | `timerCompact` (96 pt) |
-| Commandes | `Back` (étape précédente), `Pause` / `Resume` (centre, 64 pt), `Skip` (étape suivante) ; `+30s` pendant `REST` ; `Set done` / `Round done` à la place de `Skip` sur une étape manuelle | `IconButton` |
+| Décompte | Temps restant (`7`, `2:41`). Sur une étape manuelle (exercice à reps, tour de circuit), pas de chrono : le nombre à faire en grand (`5`) avec son unité dessous (`REPS`, `CLIMBS`) | `timerCompact` (96 pt) |
+| Commandes | `Back` (étape précédente), `Pause` / `Resume` (centre, 64 pt), `Skip` (étape suivante) ; `+30s` pendant `REST`. Sur une étape manuelle, le bouton central devient une coche (`Set done` / `Round done`), entre `Back` et `Skip` | `IconButton` |
 | Progression | Barre fine (3 pt) sur toute la largeur : avancement de l'étape en cours | `fg` de la phase à 40 % |
 | Suivant | `Up next: OFF 3s`, `Up next: Set 4 · HANG 7s`, `Up next: Rest 3:00` | `bodySm`, sur `surfaceRaised` |
 

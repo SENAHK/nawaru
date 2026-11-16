@@ -56,3 +56,20 @@ export function formatGrip(grip: {
     .filter(Boolean)
     .join(' ');
 }
+
+const pad = (value: number) => String(value).padStart(2, '0');
+
+/** Timer countdown from milliseconds: "7", "2:41", "1:00:00". Rounds up. */
+export function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  if (total < 60) return String(total);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
+}
+
+/** Duration from seconds: "45s", "3:00", "1:00:00". */
+export function formatDuration(seconds: number): string {
+  return seconds < 60 ? `${seconds}s` : formatCountdown(seconds * 1000);
+}

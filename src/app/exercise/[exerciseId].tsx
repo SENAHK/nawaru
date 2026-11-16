@@ -1,11 +1,12 @@
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Clapperboard } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { Badge } from '@/components/badge';
+import { Button } from '@/components/button';
 import { Chip } from '@/components/chip';
 import { EmptyState } from '@/components/empty-state';
 import { ListItem } from '@/components/list-item';
@@ -17,6 +18,7 @@ import {
   exerciseMusclesQuery,
   exerciseReferencesQuery,
 } from '@/db/queries/exercise';
+import { createFreeExerciseLog } from '@/db/queries/log';
 import { formatAddedLoad, formatDate, formatGrip } from '@/lib/format';
 import {
   categoryLabels,
@@ -85,6 +87,18 @@ export default function ExerciseDetailScreen() {
         </View>
         <AppText color="textSecondary">{exercise.description}</AppText>
       </View>
+
+      {/* Provisional entry point until Today and Session screens exist. */}
+      <Button
+        title="Start with timer"
+        size="lg"
+        onPress={() =>
+          router.push({
+            pathname: '/log/[exerciseLogId]',
+            params: { exerciseLogId: createFreeExerciseLog(exercise.id), autostart: '1' },
+          })
+        }
+      />
 
       <Section title="How to do it">
         {steps.map((step, index) => (

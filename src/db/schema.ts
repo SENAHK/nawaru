@@ -56,6 +56,20 @@ const oneOf = (name: string, column: AnySQLiteColumn, values: readonly string[])
 
 const bool = (name: string) => integer(name, { mode: 'boolean' });
 
+/** Dosage columns: which ones are used depends on the exercise's dosage scheme. */
+const dosageColumns = () => ({
+  sets: integer('sets'),
+  reps: integer('reps'),
+  durationS: integer('duration_s'),
+  onS: integer('on_s'),
+  offS: integer('off_s'),
+  restBetweenSetsS: integer('rest_between_sets_s'),
+  rounds: integer('rounds'),
+  itemsPerRound: integer('items_per_round'),
+  slotDurationS: integer('slot_duration_s'),
+  totalDurationS: integer('total_duration_s'),
+});
+
 // ---------------------------------------------------------------------------
 // Catalogue (read-only in V1, seeded)
 // ---------------------------------------------------------------------------
@@ -319,17 +333,7 @@ export const prescription = sqliteTable(
       .notNull()
       .references(() => exercise.id),
     sort: integer('sort').notNull().default(0),
-    // Dosage: which columns are used depends on the exercise's dosage scheme.
-    sets: integer('sets'),
-    reps: integer('reps'),
-    durationS: integer('duration_s'),
-    onS: integer('on_s'),
-    offS: integer('off_s'),
-    restBetweenSetsS: integer('rest_between_sets_s'),
-    rounds: integer('rounds'),
-    itemsPerRound: integer('items_per_round'),
-    slotDurationS: integer('slot_duration_s'),
-    totalDurationS: integer('total_duration_s'),
+    ...dosageColumns(),
     // Load: `loadValue` is in kg, or in % for `percent_reference`.
     loadMode: text('load_mode', { enum: loadModes }).notNull().default('none'),
     loadValue: real('load_value'),
@@ -436,6 +440,11 @@ export const exerciseLog = sqliteTable(
     /** Null for an exercise added freely. */
     prescriptionId: text('prescription_id').references(() => prescription.id),
     sort: integer('sort').notNull().default(0),
+    // Dosage targeted for this log: copied from the prescription, or entered
+    // for a free exercise. Kept here so later program edits never change it.
+    ...dosageColumns(),
+    /** Target load in kg (resolved from the prescription), null if none. */
+    targetLoadKg: real('target_load_kg'),
     gripType: text('grip_type', { enum: gripTypes }),
     fingerCount: text('finger_count', { enum: fingerCounts }),
     side: text('side', { enum: sides }),

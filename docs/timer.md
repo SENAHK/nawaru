@@ -20,7 +20,7 @@ type Phase = 'prep' | 'on' | 'off' | 'rest' | 'switch';
 
 type Step = {
   phase: Phase;
-  durationS: number | null;   // null = étape manuelle (chrono montant, fin par bouton)
+  durationS: number | null;   // null = étape manuelle (pas de chrono, fin par bouton)
   setIndex: number;           // 1..N : set, tour (circuit) ou créneau (slots)
   repIndex: number | null;    // intervalles seulement
   side: 'left' | 'right' | null;
@@ -35,10 +35,10 @@ La phase `done` n'est pas une étape : c'est l'état atteint après la dernière
 
 | Schéma | Étapes générées | Étape d'effort |
 | --- | --- | --- |
-| `reps` | `P`, puis par set : `on` manuel → `rest` | Manuelle : chrono montant, bouton `Set done` |
+| `reps` | `P`, puis par set : `on` manuel → `rest` | Manuelle : nombre de reps affiché, coche `Set done` |
 | `isometric` | `P`, puis par set : `on` (`duration_s`) → `rest` | Chronométrée |
 | `intervals` | `P`, puis par set : (`on` `on_s` → `off` `off_s`) × `reps`, le dernier `off` du set étant remplacé par `rest` | Chronométrée |
-| `circuit` | `P`, puis par tour : `on` manuel → `rest` | Manuelle : chrono montant, bouton `Round done` |
+| `circuit` | `P`, puis par tour : `on` manuel → `rest` | Manuelle : nombre de blocs affiché, coche `Round done` |
 | `slots` | `P`, puis `sets` × `on` (`slot_duration_s`), enchaînés sans pause | Chronométrée |
 | `free_duration` | `P`, puis un seul `on` (`total_duration_s`) | Chronométrée |
 
@@ -200,7 +200,7 @@ L'état actif est enregistré dans une table locale `active_timer`, à une seule
 | Ligne présente, `running` | `tick(now)` rattrape les étapes écoulées. Si le timer est encore en cours, la barre persistante l'affiche et un tap rouvre S4. S'il est arrivé à `done`, S4 s'ouvre avec les sets remplis |
 | Ligne présente, `paused` | Barre persistante avec `Paused` ; un tap rouvre S4 |
 | Ligne présente, `done` ou `stopped` | Le log n'avait pas été enregistré : S4 s'ouvre avec les sets remplis |
-| Rattrapage bloqué sur une étape manuelle | Le timer attend sur cette étape, chrono montant depuis `stepStartedAt` |
+| Rattrapage bloqué sur une étape manuelle | Le timer attend sur cette étape |
 
 ## 6. Remplissage du log en direct
 
@@ -231,9 +231,9 @@ Exemple : arrêt d'un Repeaters pendant la rep 3 du set 4 → sets 1 à 3 avec `
 | Commande | Visible |
 | --- | --- |
 | `Back` | Toujours |
-| `Pause` / `Resume` | Toujours |
-| `Skip` | Étapes chronométrées |
-| `Set done` / `Round done` | Étapes manuelles, à la place de `Skip` |
+| `Pause` / `Resume` | Étapes chronométrées |
+| `Skip` | Toujours |
+| `Set done` / `Round done` (coche) | Étapes manuelles, à la place de `Pause` ; `Skip` reste disponible et compte le set comme non fait |
 | `+30s` | Phase `rest` |
 
 - Fermer S4 sans arrêter laisse le timer tourner : la barre persistante affiche la phase et le décompte.
@@ -275,16 +275,19 @@ Si le point 2 échoue, la Live Activity reste utile en lecture seule ; un tap de
 
 ```
 src/features/timer/
-  build-steps.ts      # prescription + réglages → Step[]            (pur)
-  machine.ts          # (state, event, now) → state                 (pur)
+  types.ts            # Step, TimerState, StepResult, Cue
+  build-steps.ts      # dosage + réglages → Step[]                  (pur)
+  machine.ts          # (state, événement, now) → state             (pur)
   cues.ts             # (state avant, state après, now) → sons      (pur)
-  prefill.ts          # TimerState → lignes de sets du log          (pur)
-  audio.ts            # players expo-audio, boucle de silence
-  store.ts            # état courant, boucle d'horloge, persistance
-  live-activity.tsx   # layout et cycle de vie de la Live Activity
+  rows.ts             # lignes du log et remplissage par le timer   (pur)
+  audio.ts            # players expo-audio
+  store.ts            # session en cours, boucle d'horloge, persistance
+  timer-panel.tsx     # zone timer (vue partagée et mode focus)
+  set-row.tsx         # ligne de set du log
+tests/timer/          # tests unitaires des fichiers purs (npm test)
 ```
 
-Les quatre fichiers purs sont couverts par des tests unitaires, avec les 10 exercices de validation de `specs.md` §3 comme cas de test.
+Les fichiers purs sont couverts par des tests unitaires (`npm test`, lanceur de tests de Node via `tsx`). La boucle de silence et la Live Activity (`live-activity.tsx`) seront ajoutées avec le development build.
 
 ## 10. À valider au prototype
 
