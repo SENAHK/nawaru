@@ -198,7 +198,8 @@ Comportement attendu :
 - Écran verrouillé ou app en arrière-plan : les sons continuent (audio en arrière-plan), l'affichage n'est pas nécessaire, et le timer se recale immédiatement au retour au premier plan.
 - Pause, reprise, passer le repos, ajouter 30s de repos.
 - Durée de préparation configurable (10s par défaut). Exercice unilatéral : le timer alterne gauche et droite à chaque set, avec 10s de repos entre les deux côtés (réglable), et le côté en cours est affiché en très grand.
-- À la fin (ou à l'arrêt), le timer pré-remplit le log avec ce qui a été fait : arrêt au set 4, rep 3 → log pré-rempli avec 3 sets complets et 2 reps au 4e.
+- Le timer et le log sont sur le même écran : le timer en haut, les sets en dessous, modifiables pendant les repos. Le timer remplit les sets au fur et à mesure : arrêt au set 4, rep 3 → 3 sets complets et 2 reps au 4e.
+- Écran verrouillé : une Live Activity affiche la phase, le décompte et les commandes principales.
 
 ### Log intelligent
 
@@ -292,6 +293,9 @@ L'app se rémunère par un abonnement coach, qui déverrouille l'accès quel que
 | Plateformes | iOS uniquement en V1 ; Android plus tard |
 | Audio du timer | `expo-audio`, avec lecture en arrière-plan (`enableBackgroundPlayback`, `shouldPlayInBackground`) et en mode silencieux (`playsInSilentMode`) |
 | Effet verre | `expo-glass-effect` conservé, limité à la navigation (voir `design-system.md` §5) |
+| Environnement de développement | Expo Go dans un premier temps : pas de module natif hors Expo Go. L'audio en arrière-plan et la Live Activity (`expo-widgets`) attendent le passage à un development build |
+| Timer et log | Un seul écran (timer en haut, sets en dessous), avec un mode focus plein écran |
+| Écran verrouillé | Live Activity via `expo-widgets` (voir `timer.md` §8) |
 | Pause d'un programme | Les séances sont masquées pendant la pause et ne deviennent pas manquées ; le décalage est proposé à la reprise |
 
 Les specs fonctionnelles de la V1 sont considérées comme complètes. La mécanique du timer est décrite dans `timer.md`. Prochaine étape : le prototype du timer sur appareil.

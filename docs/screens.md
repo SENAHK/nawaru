@@ -6,13 +6,15 @@
 
 ### 1.1 Onglets (TabBar)
 
-| Onglet | Icône (lucide) | Écran racine |
+La TabBar est la barre d'onglets native d'iOS (`NativeTabs` d'Expo Router, effet verre sur iOS 26). Ses icônes sont donc des SF Symbols ; lucide reste la bibliothèque d'icônes du contenu des écrans.
+
+| Onglet | Icône (SF Symbol) | Écran racine |
 | --- | --- | --- |
-| `Today` | `sun` | S1 Today |
+| `Today` | `sun.max` | S1 Today |
 | `Calendar` | `calendar` | S2 Calendar |
-| `Programs` | `layers` | S7 Programs |
-| `Library` | `book-open` | S11 Library |
-| `Progress` | `trending-up` | S12 Progress |
+| `Programs` | `square.stack.3d.up` | S7 Programs |
+| `Library` | `book` | S11 Library |
+| `Progress` | `chart.line.uptrend.xyaxis` | S12 Progress |
 
 Les réglages (S13) s'ouvrent depuis l'icône `settings` en haut à droite de Today.
 
@@ -26,13 +28,12 @@ src/app/
     _layout.tsx                  # TabBar
     index.tsx                    # S1 Today
     calendar.tsx                 # S2 Calendar
-    programs/index.tsx           # S7 Programs
-    library/index.tsx            # S11 Library
-    progress/index.tsx           # S12 Progress
+    programs.tsx                 # S7 Programs
+    library.tsx                  # S11 Library
+    progress.tsx                 # S12 Progress
   session/[scheduledSessionId].tsx   # S3 Session (planned)
   workout/[workoutId].tsx            # S3 Session (free workout)
-  timer/[exerciseLogId].tsx          # S4 Timer (modal, full screen)
-  log/[exerciseLogId].tsx            # S5 Log (modal)
+  log/[exerciseLogId].tsx            # S4 Exercise (timer + log) et S5 Log (modal)
   program/[programId]/index.tsx      # S8 Program detail
   program/[programId]/edit.tsx       # S9 Program editor
   program/[programId]/grid.tsx       # S9b Grid view
@@ -123,7 +124,7 @@ Même écran pour une séance prévue (`scheduled_session`) et pour un workout l
 | Charge | Résolue selon §3.1 |
 | Note | Note de l'auteur, en `bodySm` italique, si présente |
 | État | `To do`, `Done` (coche `success`), `Partial` (si des sets échoués) |
-| Actions | `Start` (ouvre S4) si le schéma a un timer, sinon `Log` (ouvre S5) ; `Log` est toujours accessible via le menu de la carte |
+| Actions | `Start` (ouvre S4 et lance le timer) ; `Log` (ouvre S5, sans timer) est toujours accessible via le menu de la carte |
 
 En bas de liste : `Add exercise` (S6, ajoute un exercice libre à ce workout).
 
@@ -140,29 +141,50 @@ En bas de liste : `Add exercise` (S6, ajoute un exercice libre à ce workout).
 | Séance terminée | Les exercices restent modifiables (réouvrir S5) |
 | Supprimer le workout | Menu `Delete log` : supprime workout, exercise_logs et set_logs ; la séance redevient `planned` ou `missed` |
 
-### S4 Timer
+### S4 Exercise (timer + log)
 
-Écran plein écran, ouvert en modal. Le comportement complet (machine à états, audio, reprise) est décrit dans `timer.md`.
+Modal plein écran. Le timer et le log partagent **un seul écran** : le timer en haut, les sets en dessous, pour corriger une valeur pendant un repos sans changer d'écran. La mécanique (machine à états, audio, reprise) est décrite dans `timer.md`.
 
-**Disposition (de haut en bas) :**
+**Zone timer** (haut de l'écran, environ 40 % de la hauteur, fond de la couleur de la phase) :
 
-| Zone | Contenu | Style |
+| Élément | Contenu | Style |
 | --- | --- | --- |
-| Barre haute | Bouton fermer (`x`), nom de l'exercice, `Set 3/6` | `title3`, couleur de texte de la phase |
-| Phase | `GET READY`, `HANG`, `OFF`, `REST`, `SWITCH`, `DONE` | `displayL` |
-| Côté (si unilatéral) | `LEFT` ou `RIGHT` avec une flèche, très grand, juste sous la phase | `displayL` |
-| Décompte | Secondes restantes (`7`, `2:41`) | `timer` (160 pt) |
-| Contexte | `Rep 2/5`, charge, prise, bord | `title2` |
-| Suivant | `Next: OFF 7s` ou `Next: Set 4 · HANG 7s` | `bodySm` |
-| Commandes | `Pause` / `Resume` (64 pt, centre), `Skip` (passer la phase), `+30s` (pendant `REST` seulement) | `IconButton` 64 |
+| Barre haute | Bouton fermer (`chevron-down`), phase (`GET READY`, `HANG`, `OFF`, `REST`, `SWITCH`, `DONE`), bouton son (`volume-2` / `volume-x`) | `title2`, couleur de texte de la phase |
+| Côté (si unilatéral) | `LEFT` ou `RIGHT` avec une flèche, à gauche du décompte | `displayM` |
+| Décompte | Temps restant (`7`, `2:41`), ou chrono montant pour une étape manuelle | `timerCompact` (96 pt) |
+| Commandes | `Back` (étape précédente), `Pause` / `Resume` (centre, 64 pt), `Skip` (étape suivante) ; `+30s` pendant `REST` ; `Set done` / `Round done` à la place de `Skip` sur une étape manuelle | `IconButton` |
+| Progression | Barre fine (3 pt) sur toute la largeur : avancement de l'étape en cours | `fg` de la phase à 40 % |
+| Suivant | `Up next: OFF 3s`, `Up next: Set 4 · HANG 7s`, `Up next: Rest 3:00` | `bodySm`, sur `surfaceRaised` |
 
-- Fond plein écran de la couleur de la phase (`timerPhases`), fondu de 320 ms entre les phases.
-- Fermer (`x`) ou arrêter : confirmation `Stop timer?` (`Stop and log` / `Keep going`). `Stop and log` ouvre S5 pré-rempli avec ce qui a été fait.
-- Fin normale : phase `DONE` pendant 2s, puis ouverture automatique de S5 pré-rempli.
+- Fondu de 320 ms entre les couleurs de phase.
+- Le bouton son coupe ou rétablit les sons du timer (même réglage que `Sounds` dans S13).
+- **Mode focus** : un tap sur le décompte agrandit la zone timer en plein écran (décompte en `timer` 160 pt, phase et côté en `displayL`, contexte `Set 3/6 · Rep 2/5`, charge, prise, bord). Un nouveau tap revient à la vue partagée. C'est le mode à utiliser quand le téléphone est posé loin de la poutre.
+
+**Zone log** (bas de l'écran, défilante) : les mêmes blocs que S5 (en-tête d'exercice, paramètres, sets, effort, notes), avec ces particularités pendant que le timer tourne :
+
+| Élément | Comportement |
+| --- | --- |
+| En-tête d'exercice | Pastille de catégorie, nom, `DosageSummary` ; repliable pour gagner de la place |
+| Set en cours | `SetRow` avec bordure 2 pt `accent` ; la liste défile automatiquement pour le garder visible |
+| Set terminé | Numéro du set sur pastille pleine `success` ; valeurs réelles inscrites par le timer (reps complètes, durée tenue) |
+| Set à venir | Valeurs pré-remplies en `textSecondary` |
+| Modification | Toutes les lignes restent modifiables pendant le timer ; une valeur modifiée à la main n'est plus écrasée par le timer |
+| `Skip set` | Retire le dernier set à venir ; le timer s'adapte |
+| `Add set` | Ajoute un set après le dernier ; le timer s'adapte |
+
+**Bouton principal** : `Save` (bas d'écran, fixe). Pendant que le timer tourne, il devient `Stop and save` avec confirmation `Stop timer?` (`Stop and save` / `Keep going`).
+
+**Fin et fermeture :**
+
+| Situation | Comportement |
+| --- | --- |
+| Fin normale | Phase `DONE` pendant 2s, puis la zone timer se replie : l'écran devient S5, avec les sets déjà remplis. L'athlète ajuste, saisit l'effort, puis `Save` |
+| Fermer (`chevron-down`) pendant le timer | Le timer continue ; la barre persistante affiche la phase et le décompte, un tap rouvre S4 |
+| Écran verrouillé ou app en arrière-plan | Une Live Activity affiche le timer (voir `timer.md` §8) |
 
 ### S5 Log exercise
 
-Ouvert depuis S3, S4 ou S6. Modal plein écran.
+Même écran et même route que S4, sans la zone timer : c'est l'état de S4 quand aucun timer ne tourne pour cet exercice. Ouvert depuis S3 (`Log`, ou réouverture d'un exercice déjà logué), depuis S6 pour un schéma sans timer, ou atteint à la fin du timer.
 
 **En-tête** : nom de l'exercice, résumé de la prescription (`Prescribed: 7s × 5 × 6 · +5 kg`) ou `Free exercise`.
 
@@ -205,7 +227,7 @@ Ouvert depuis S3, S4 ou S6. Modal plein écran.
 
 1. Recherche dans la bibliothèque (même liste et mêmes filtres que S11, en mode sélection).
 2. Après sélection : formulaire de dosage rapide (identique à S10, sans les options de test ni de progression), pré-rempli avec la dernière réalisation de cet exercice, sinon avec des valeurs par défaut par schéma (§3.3).
-3. `Add` : crée un `exercise_log` sans prescription dans le workout ciblé, puis ouvre S4 (si timer) ou S5.
+3. `Add` : crée un `exercise_log` sans prescription dans le workout ciblé, puis ouvre S4 et lance le timer.
 
 ### S7 Programs
 

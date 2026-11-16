@@ -1,6 +1,6 @@
 # Design system V1
 
-> Ambiance **outdoor / nature** : tons minéraux chauds (roche, magnésie, lichen), accent **bruyère** (violet des fleurs d'altitude). Thème **sombre par défaut**, thème clair disponible. Le timer utilise un **fond plein écran coloré par phase**, lisible de loin depuis la poutre.
+> Ambiance **outdoor / nature** : tons minéraux chauds (roche, magnésie, lichen), accent **bruyère** (violet des fleurs d'altitude). Thème **sombre par défaut**, thème clair disponible. Le timer colore sa zone par phase, au-dessus du log ; en mode focus, il passe en **plein écran**, lisible de loin depuis la poutre.
 
 ## 1. Principes
 
@@ -95,7 +95,7 @@ Les composants n'utilisent **que** ces tokens, jamais les palettes de base.
 
 ### 2.3 Couleurs du timer (identiques dans les deux thèmes)
 
-Chaque phase colore **tout l'écran**. Le texte reste à fort contraste.
+Chaque phase colore toute la zone timer (le haut de l'écran en vue partagée, tout l'écran en mode focus). Le texte reste à fort contraste.
 
 | Phase | Fond | Texte | Raison |
 | --- | --- | --- | --- |
@@ -139,7 +139,8 @@ Chargement via `@expo-google-fonts/barlow` et `@expo-google-fonts/barlow-condens
 
 | Token | Police | Taille / interligne | Graisse | Usage |
 | --- | --- | --- | --- | --- |
-| `timer` | Barlow Condensed | 160 / 160 | 700 | Chiffres du timer |
+| `timer` | Barlow Condensed | 160 / 160 | 700 | Chiffres du timer en mode focus |
+| `timerCompact` | Barlow Condensed | 96 / 96 | 700 | Chiffres du timer en vue partagée (au-dessus du log) |
 | `displayL` | Barlow Condensed | 56 / 60 | 700 | Phase du timer ("HANG", "REST"), côté ("LEFT") |
 | `displayM` | Barlow Condensed | 40 / 44 | 600 | Valeur principale d'un set en cours |
 | `title1` | Barlow Condensed | 28 / 32 | 600 | Titre d'écran |
@@ -238,14 +239,15 @@ Liste fermée pour la V1. Chaque composant consomme uniquement des tokens.
 | `Stepper` | entier, décimal (pas 0.5 ou 1 kg ; 1 rep ; 1s) | Boutons 48 pt de chaque côté, appui long = répétition, tap sur la valeur = saisie clavier numérique |
 | `GripPicker` | 3 étapes : type → doigts → main ; raccourcis des combinaisons récentes en tête | Résumé compact : "4F HC", "3F Drag", "L 2FM Pocket" |
 | `EffortPicker` | `rpe` (1 à 10, pas 0.5), `rir` (0 à 5), `feel` (Easy / Moderate / Hard / Very hard / Max) | Une rangée de pastilles, une seule sélection |
-| `SetRow` | à faire, réussi, échoué, en cours | Valeurs pré-remplies en `textSecondary`, modifiées en `textPrimary` |
+| `SetRow` | à faire, réussi (numéro sur pastille `success`), échoué, en cours (bordure 2 pt `accent`) | Valeurs pré-remplies en `textSecondary`, modifiées en `textPrimary` |
 | `DosageSummary` | texte compact | `7s × 5 × 6 · 20 mm · 4F HC · +5 kg` |
 | `ProgramDot` | 6 couleurs | Distinction des programmes |
 | `BottomSheet` | hauteur auto, plein écran | Ajout d'exercice, filtres, sélecteurs |
 | `TabBar` | 5 onglets (`Today`, `Calendar`, `Programs`, `Library`, `Progress`) | Icône + libellé, actif en `accent` |
 | `EmptyState` | icône, titre, texte, action | |
 | `Toast` | info, succès, erreur | Bas d'écran, 3s |
-| `TimerScreen` | phases §2.3 | Voir écrans |
+| `TimerPanel` | `compact` (au-dessus du log), `focus` (plein écran) ; phases §2.3 | Commandes `Back`, `Pause`, `Skip` ; barre de progression de l'étape ; ligne `Up next` |
+| `TimerLiveActivity` | écran verrouillé, Dynamic Island | Composants SwiftUI (`@expo/ui/swift-ui`), hors tokens RN : reprendre les couleurs de `timerPhases` |
 
 ## 10. Rédaction (interface en anglais)
 
@@ -370,6 +372,7 @@ export const touch = { min: 48, workout: 56, timer: 64 } as const;
 
 export const typography = {
   timer: { fontFamily: 'BarlowCondensed_700Bold', fontSize: 160, lineHeight: 160 },
+  timerCompact: { fontFamily: 'BarlowCondensed_700Bold', fontSize: 96, lineHeight: 96 },
   displayL: { fontFamily: 'BarlowCondensed_700Bold', fontSize: 56, lineHeight: 60 },
   displayM: { fontFamily: 'BarlowCondensed_600SemiBold', fontSize: 40, lineHeight: 44 },
   title1: { fontFamily: 'BarlowCondensed_600SemiBold', fontSize: 28, lineHeight: 32 },

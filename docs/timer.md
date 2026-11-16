@@ -1,6 +1,6 @@
 # Timer V1
 
-> Références : `specs.md` §5 (comportement attendu), `screens.md` S4 (disposition), `design-system.md` §2.3 et §8 (couleurs et sons), `data-model.md` §7 (colonnes de dosage). Ce fichier décrit la mécanique : génération des étapes, machine à états, horloge, audio en arrière-plan, reprise et pré-remplissage du log. iOS uniquement.
+> Références : `specs.md` §5 (comportement attendu), `screens.md` S4 (disposition : timer et log sur le même écran), `design-system.md` §2.3 et §8 (couleurs et sons), `data-model.md` §7 (colonnes de dosage). Ce fichier décrit la mécanique : génération des étapes, machine à états, horloge, audio en arrière-plan, reprise, remplissage du log et Live Activity. iOS uniquement.
 
 ## 1. Principes
 
@@ -103,8 +103,10 @@ Temps restant affiché = `stepEndsAt - now` (ou `stepEndsAt - pausedAt` en pause
 | `pause` | `running` | `paused`, `pausedAt = now` |
 | `resume` | `paused` | `running` ; `stepStartedAt` et `stepEndsAt` sont décalés de `now - pausedAt` |
 | `skip` | `running` ou `paused` | Clôture l'étape en cours et passe à la suivante à `now`. Une étape d'effort passée est enregistrée `completed = false` avec le temps tenu |
+| `back` | `running` ou `paused` | Redémarre l'étape en cours à `now`. Dans les 2 premières secondes d'une étape, revient à l'étape précédente et la redémarre. Le résultat déjà enregistré d'une étape d'effort rejouée est remplacé |
 | `addRest(30)` | `running` ou `paused`, phase `rest` | `stepEndsAt += 30 000` |
 | `stop` | `running` ou `paused` | `stopped` ; l'étape d'effort en cours est enregistrée `completed = false` |
+| `setsChanged` | `running` ou `paused` | `Skip set` ou `Add set` depuis le log : les étapes situées après le set en cours sont régénérées avec le nouveau nombre de sets ; l'étape en cours n'est pas touchée |
 | fin de la dernière étape | `running` | `done` |
 
 Le rattrapage en boucle de `tick` est ce qui recale le timer après une suspension : au retour au premier plan, un seul `tick(now)` traverse toutes les étapes écoulées. Les sons des étapes traversées en rattrapage ne sont pas rejoués.
@@ -144,7 +146,7 @@ Haptique (si `haptics_enabled`, au premier plan seulement) : impact moyen à cha
 | `playsInSilentMode` | `true` | Sons malgré le commutateur silencieux |
 | `interruptionMode` | `'mixWithOthers'` | Les bips se superposent à la musique de l'athlète sans la couper |
 
-Conséquence de `mixWithOthers` : pas de commandes sur l'écran verrouillé (elles exigent `doNotMix`). Accepté en V1, car couper la musique de l'athlète serait pire.
+Conséquence de `mixWithOthers` : pas de commandes audio système sur l'écran verrouillé (elles exigent `doNotMix`). Ce rôle est tenu par la Live Activity (§8), qui ne coupe pas la musique de l'athlète.
 
 Lecture :
 
@@ -195,14 +197,16 @@ L'état actif est enregistré dans une table locale `active_timer`, à une seule
 
 | Situation au lancement de l'app | Comportement |
 | --- | --- |
-| Ligne présente, `running` | `tick(now)` rattrape les étapes écoulées. Si le timer est encore en cours, la barre persistante l'affiche et un tap rouvre S4. S'il est arrivé à `done`, S5 s'ouvre pré-rempli |
+| Ligne présente, `running` | `tick(now)` rattrape les étapes écoulées. Si le timer est encore en cours, la barre persistante l'affiche et un tap rouvre S4. S'il est arrivé à `done`, S4 s'ouvre avec les sets remplis |
 | Ligne présente, `paused` | Barre persistante avec `Paused` ; un tap rouvre S4 |
-| Ligne présente, `done` ou `stopped` | Le log n'avait pas été enregistré : S5 s'ouvre pré-rempli |
+| Ligne présente, `done` ou `stopped` | Le log n'avait pas été enregistré : S4 s'ouvre avec les sets remplis |
 | Rattrapage bloqué sur une étape manuelle | Le timer attend sur cette étape, chrono montant depuis `stepStartedAt` |
 
-## 6. Pré-remplissage du log
+## 6. Remplissage du log en direct
 
-À `done` ou `stopped`, `results` est converti en `set_log`. Seuls les sets commencés produisent une ligne ; charge, prise et bord viennent de la prescription selon l'ordre de `specs.md` §5.
+Le log est affiché sous le timer (S4) et se remplit au fil des étapes : à chaque set clôturé, `results` met à jour la ligne correspondante. Les sets à venir restent pré-remplis avec les valeurs prescrites ; à `stopped`, ceux qui n'ont pas été commencés sont retirés. Charge, prise et bord viennent de la prescription selon l'ordre de `specs.md` §5.
+
+Une valeur modifiée à la main par l'athlète n'est plus écrasée par le timer. Rien n'est écrit dans `set_log` avant `Save` : jusque-là, les lignes vivent dans l'état de l'écran et dans `active_timer`.
 
 | Schéma | Une ligne par | Valeurs |
 | --- | --- | --- |
@@ -219,40 +223,77 @@ Exemple : arrêt d'un Repeaters pendant la rep 3 du set 4 → sets 1 à 3 avec `
 
 ## 7. Écran et barre persistante
 
-- S4 lit l'état du timer et applique `timerPhases` ; en pause, la couleur de phase est assombrie.
+- La zone timer de S4 lit l'état du timer et applique `timerPhases` ; en pause, la couleur de phase est assombrie.
+- La barre de progression affiche `(now - stepStartedAt) / durée` ; elle est masquée sur une étape manuelle.
 - `expo-keep-awake` est actif tant que S4 est affiché.
 - Commandes visibles par contexte :
 
 | Commande | Visible |
 | --- | --- |
+| `Back` | Toujours |
 | `Pause` / `Resume` | Toujours |
 | `Skip` | Étapes chronométrées |
 | `Set done` / `Round done` | Étapes manuelles, à la place de `Skip` |
 | `+30s` | Phase `rest` |
 
-- Fermer S4 sans arrêter (geste retour) laisse le timer tourner : la barre persistante affiche la phase et le décompte.
+- Fermer S4 sans arrêter laisse le timer tourner : la barre persistante affiche la phase et le décompte.
 
-## 8. Organisation du code
+## 8. Live Activity
+
+Quand l'app passe en arrière-plan ou que l'écran se verrouille avec un timer `running` ou `paused`, une Live Activity affiche le timer sur l'écran verrouillé et dans la Dynamic Island. Elle est réalisée avec `expo-widgets` (layouts en `@expo/ui/swift-ui`), qui demande un development build.
+
+| Zone | Contenu |
+| --- | --- |
+| Titre | Pastille de la couleur de phase + nom de la phase (`Rest`, `Hang`, `Get ready`) |
+| Ligne 2 | `Set 1 of 4` à gauche, `Up next: …` à droite |
+| Progression | Barre d'avancement de l'étape |
+| Décompte | Temps restant, en grand |
+| Boutons | `Skip rest` (phase `rest` seulement) et `Pause` / `Resume` |
+| Dynamic Island compacte | Pastille de phase à gauche, décompte à droite |
+
+Cycle de vie :
+
+| Moment | Appel |
+| --- | --- |
+| Démarrage du timer | `start(props)` |
+| Chaque transition (étape, pause, reprise, `+30s`) | `update(props)` avec la phase, les libellés et l'instant de fin de l'étape |
+| `done` | `update` vers l'état `Done`, puis `end` après quelques secondes |
+| `stopped` ou log enregistré | `end('immediate')` |
+| Lancement de l'app | `getInstances()` pour retrouver ou fermer une activité orpheline |
+
+Les mises à jour n'ont lieu qu'aux transitions, jamais chaque seconde : le décompte doit donc avancer seul côté système, à partir de l'instant de fin transmis.
+
+**Points non couverts par la doc d'`expo-widgets`, à lever au prototype :**
+
+1. Un texte de décompte et une barre de progression qui avancent seuls dans une Live Activity. Sans cela, le décompte serait figé entre deux transitions, et il faudrait afficher l'heure de fin à la place.
+2. Des boutons interactifs dans une Live Activity. La doc ne les décrit que pour les widgets, et précise que les événements n'atteignent le JS que si le processus de l'app est vivant. C'est le cas tant que la boucle de silence tourne (§4.3), mais pas en pause : il faudra soit garder la boucle active en pause, soit retirer le bouton `Resume` de la Live Activity.
+3. `update()` appelé depuis l'app en arrière-plan.
+
+Si le point 2 échoue, la Live Activity reste utile en lecture seule ; un tap dessus ouvre S4.
+
+## 9. Organisation du code
 
 ```
 src/features/timer/
   build-steps.ts      # prescription + réglages → Step[]            (pur)
   machine.ts          # (state, event, now) → state                 (pur)
   cues.ts             # (state avant, state après, now) → sons      (pur)
-  prefill.ts          # TimerState → set_log pré-remplis            (pur)
+  prefill.ts          # TimerState → lignes de sets du log          (pur)
   audio.ts            # players expo-audio, boucle de silence
   store.ts            # état courant, boucle d'horloge, persistance
+  live-activity.tsx   # layout et cycle de vie de la Live Activity
 ```
 
 Les quatre fichiers purs sont couverts par des tests unitaires, avec les 10 exercices de validation de `specs.md` §3 comme cas de test.
 
-## 9. À valider au prototype
+## 10. À valider au prototype
 
-Dans cet ordre, sur un iPhone réel avec un development build :
+Le développement commence dans Expo Go, où le timer fonctionne au premier plan seulement (sons compris) et se recale au retour dans l'app. Les points ci-dessous demandent un development build et seront validés à ce moment-là, dans cet ordre, sur un iPhone réel :
 
 1. Un Repeaters complet (environ 20 min), écran verrouillé : tous les bips jouent, à l'heure.
 2. Idem avec de la musique en lecture dans une autre app : les bips se superposent, la musique ne s'arrête pas.
 3. Commutateur silencieux activé : les bips jouent.
 4. Appel entrant pendant un repos : les sons reprennent après l'appel.
 5. App tuée pendant un repos, puis relancée : le timer est recalé.
-6. Chiffres tabulaires de Barlow Condensed à 160 pt : le décompte ne "saute" pas en largeur.
+6. Chiffres tabulaires de Barlow Condensed à 96 et 160 pt : le décompte ne "saute" pas en largeur.
+7. Live Activity : décompte qui avance seul, mise à jour à chaque changement de phase écran verrouillé, boutons `Skip rest` et `Pause`.
