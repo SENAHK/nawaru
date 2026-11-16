@@ -13,6 +13,9 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { EmptyState } from '@/components/empty-state';
+import { Screen } from '@/components/screen';
+import { DatabaseGate } from '@/db/provider';
 import { AppThemeProvider, typography, useTheme } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -25,22 +28,35 @@ export default function RootLayout() {
     BarlowCondensed_600SemiBold,
     BarlowCondensed_700Bold,
   });
-  const ready = fontsLoaded || fontError != null;
-
-  useEffect(() => {
-    if (ready) SplashScreen.hideAsync();
-  }, [ready]);
-
-  if (!ready) return null;
+  if (!fontsLoaded && fontError == null) return null;
 
   return (
     <AppThemeProvider>
-      <RootNavigator />
+      <DatabaseGate fallback={(error) => <DatabaseError error={error} />}>
+        <RootNavigator />
+      </DatabaseGate>
     </AppThemeProvider>
   );
 }
 
+/** Hides the splash screen once the first real screen is mounted. */
+function useHideSplash() {
+  useEffect(() => {
+    SplashScreen.hideAsync();
+  }, []);
+}
+
+function DatabaseError({ error }: { error: Error }) {
+  useHideSplash();
+  return (
+    <Screen>
+      <EmptyState title="Could not open your data" text={error.message} />
+    </Screen>
+  );
+}
+
 function RootNavigator() {
+  useHideSplash();
   const { colors, scheme } = useTheme();
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
   const navigationTheme = {

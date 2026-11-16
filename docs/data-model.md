@@ -74,9 +74,9 @@ Trois blocs : **catalogue** (exercices, lecture seule en V1), **plan** (programm
 
 | Table | Colonnes | Notes |
 | --- | --- | --- |
-| `muscle` | `name`, `body_region` | Liste fermée |
+| `muscle` | `slug` (unique), `name`, `body_region` | Liste fermée ; `body_region` : `arms`, `shoulders`, `back`, `chest`, `core`, `legs` |
 | `exercise_muscle` | `exercise_id`, `muscle_id`, `role` (`primary` / `secondary`) | |
-| `equipment` | `name` | Hangboard, barre, poulie, blocs... |
+| `equipment` | `slug` (unique), `name` | Hangboard, barre, poulie, blocs... |
 | `exercise_equipment` | `exercise_id`, `equipment_id` | |
 | `exercise_measure` | `exercise_id`, `measure` | `load`, `grip`, `edge`, `grade`, `tempo`, `range`, `effort`, `result` : champs proposés à la prescription et au log |
 | `exercise_media` | `exercise_id`, `kind` (`video` / `image`), `uri`, `sort` | Contenu à définir |
@@ -288,7 +288,19 @@ Une validation côté code (schéma Zod par `dosage_scheme`) garantit que les co
 | Stats max hangs | `set_log` des exercices `isometric` filtrés, groupés par prise × bord × durée ; % du poids de corps si `bodyweight_kg` est renseigné |
 | Timer | Liste d'étapes générée depuis la prescription (préparation, ON, OFF, repos, changement de côté). L'état actif est persisté dans la table locale `active_timer` (une ligne, non synchronisée) pour que l'affichage se recale au retour au premier plan. Détail dans `timer.md` |
 
-## 10. Hors V1 (déjà prévu dans le schéma)
+## 10. Implémentation
+
+| Élément | Emplacement |
+| --- | --- |
+| Schéma Drizzle | `src/db/schema.ts` (énumérations dans `src/db/enums.ts`) |
+| Migrations SQL générées | `drizzle/` ; régénérer avec `npm run db:generate` après toute modification du schéma |
+| Validation des dosages (Zod) | `src/db/dosage.ts` |
+| Seed | `src/db/seed/` : `catalog.ts` (muscles, équipement, exercices), `demo-program.ts` (coach factice et programme de démo) |
+| Contrôle du seed | `npm run check:seed` applique les migrations et le seed à une base SQLite en mémoire, clés étrangères et contraintes `CHECK` actives |
+
+Le seed est chargé au premier lancement, quand la table `exercise` est vide. Le programme de démo est rattaché à l'athlète et inscrit à l'onboarding, une fois son profil créé.
+
+## 11. Hors V1 (déjà prévu dans le schéma)
 
 - `coach_athlete.logs_visible` et les champs template de `program` : utilisés en V2.
 - Exercices custom : ajout futur de `exercise.owner_id` nullable (null = bibliothèque officielle).
