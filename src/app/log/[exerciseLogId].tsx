@@ -23,27 +23,8 @@ import {
   useSession,
 } from '@/features/timer/store';
 import { TimerPanel } from '@/features/timer/timer-panel';
-import type { TimerDosage } from '@/features/timer/types';
-import { formatDuration } from '@/lib/format';
+import { dosageSummary } from '@/lib/dosage-summary';
 import { space, useTheme } from '@/theme';
-
-/** "7s:3s × 5 × 6", smallest unit first (docs/design-system.md §10). */
-function dosageSummary(dosage: TimerDosage): string {
-  switch (dosage.scheme) {
-    case 'reps':
-      return `${dosage.reps} reps × ${dosage.sets} sets`;
-    case 'isometric':
-      return `${formatDuration(dosage.durationS ?? 0)} × ${dosage.sets}`;
-    case 'intervals':
-      return `${dosage.onS}s:${dosage.offS}s × ${dosage.reps} × ${dosage.sets}`;
-    case 'circuit':
-      return `${dosage.itemsPerRound} climbs × ${dosage.rounds} rounds`;
-    case 'slots':
-      return `${formatDuration(dosage.slotDurationS ?? 0)} × ${dosage.sets}`;
-    case 'free_duration':
-      return formatDuration(dosage.totalDurationS ?? 0);
-  }
-}
 
 // S4 Exercise (timer + log) and S5 Log: same screen, with or without a timer
 // (docs/screens.md). Grip, effort and notes come with the full log step.

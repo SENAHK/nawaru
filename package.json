@@ -56,7 +56,7 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "check:seed": "tsx scripts/check-seed.ts",
-    "test": "tsx --test tests/**/*.test.ts"
+    "test": "tsx --import ./tests/setup.ts --test tests/**/*.test.ts"
   },
   "private": true
 }

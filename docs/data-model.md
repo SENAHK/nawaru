@@ -299,8 +299,12 @@ Une validation côté code (schéma Zod par `dosage_scheme`) garantit que les co
 | Validation des dosages (Zod) | `src/db/dosage.ts` |
 | Seed | `src/db/seed/` : `catalog.ts` (muscles, équipement, exercices), `demo-program.ts` (coach factice et programme de démo) |
 | Contrôle du seed | `npm run check:seed` applique les migrations et le seed à une base SQLite en mémoire, clés étrangères et contraintes `CHECK` actives |
+| Requêtes | `src/db/queries/` ; les écrans les lisent avec `useDbQuery`, qui relance la lecture à chaque changement de la base |
+| Tests | `npm test` : logique pure (timer, calendrier, charges) et un parcours complet en base (onboarding, séance de test, référence, charges en %), sur une base SQLite en mémoire |
 
-Le seed est chargé au premier lancement, quand la table `exercise` est vide. Le programme de démo est rattaché à l'athlète et inscrit à l'onboarding, une fois son profil créé.
+Le seed est chargé au premier lancement, quand la table `exercise` est vide. À l'onboarding, les programmes du coach factice sont rattachés à l'athlète et inscrits avec, pour date de début, le lundi de la semaine en cours.
+
+Un workout est créé à la première action sur une séance (`Start session`, ou ouverture d'un exercice), avec un `exercise_log` par prescription : dosage, prise et charge résolue y sont copiés à ce moment-là.
 
 ## 11. Hors V1 (déjà prévu dans le schéma)
 

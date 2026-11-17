@@ -16,6 +16,8 @@ import { useEffect } from 'react';
 import { EmptyState } from '@/components/empty-state';
 import { Screen } from '@/components/screen';
 import { DatabaseGate } from '@/db/provider';
+import { getAthlete } from '@/db/queries/profile';
+import { useDbQuery } from '@/db/use-db-version';
 import { restoreSession } from '@/features/timer/store';
 import { AppThemeProvider, typography, useTheme } from '@/theme';
 
@@ -61,6 +63,8 @@ function RootNavigator() {
   // Brings back a timer that was running when the app was closed.
   useEffect(() => restoreSession(), []);
   const { colors, scheme } = useTheme();
+  // Until the athlete profile exists, onboarding is the only reachable screen.
+  const onboarded = useDbQuery(() => getAthlete() != null, 'athlete');
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
   const navigationTheme = {
     ...base,
@@ -85,19 +89,23 @@ function RootNavigator() {
           headerTitleStyle: { fontFamily: typography.title3.fontFamily, color: colors.textPrimary },
           contentStyle: { backgroundColor: colors.bg },
         }}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="session/[scheduledSessionId]" options={{ title: 'Session' }} />
-        <Stack.Screen name="workout/[workoutId]" options={{ title: 'Free session' }} />
-        <Stack.Screen
-          name="log/[exerciseLogId]"
-          options={{ presentation: 'fullScreenModal', headerShown: false }}
-        />
-        <Stack.Screen name="program/[programId]/index" options={{ title: 'Program' }} />
-        <Stack.Screen name="program/[programId]/edit" options={{ title: 'Edit program' }} />
-        <Stack.Screen name="program/[programId]/grid" options={{ title: 'Grid view' }} />
-        <Stack.Screen name="exercise/[exerciseId]" options={{ title: 'Exercise' }} />
-        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Protected guard={!onboarded}>
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        </Stack.Protected>
+        <Stack.Protected guard={onboarded}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="session/[scheduledSessionId]" options={{ title: 'Session' }} />
+          <Stack.Screen name="workout/[workoutId]" options={{ title: 'Free session' }} />
+          <Stack.Screen
+            name="log/[exerciseLogId]"
+            options={{ presentation: 'fullScreenModal', headerShown: false }}
+          />
+          <Stack.Screen name="program/[programId]/index" options={{ title: 'Program' }} />
+          <Stack.Screen name="program/[programId]/edit" options={{ title: 'Edit program' }} />
+          <Stack.Screen name="program/[programId]/grid" options={{ title: 'Grid view' }} />
+          <Stack.Screen name="exercise/[exerciseId]" options={{ title: 'Exercise' }} />
+          <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        </Stack.Protected>
       </Stack>
     </ThemeProvider>
   );

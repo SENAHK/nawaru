@@ -1,5 +1,14 @@
-import { PlaceholderScreen } from '@/components/placeholder-screen';
+import { useLocalSearchParams } from 'expo-router';
 
-export default function SessionScreen() {
-  return <PlaceholderScreen title="Session" withHeader={false} />;
+import { getScheduledSessions } from '@/db/queries/schedule';
+import { useDbQuery } from '@/db/use-db-version';
+import { SessionView } from '@/features/session/session-view';
+
+export default function ScheduledSessionScreen() {
+  const { scheduledSessionId } = useLocalSearchParams<{ scheduledSessionId: string }>();
+  const session = useDbQuery(
+    () => getScheduledSessions({ scheduledSessionId })[0] ?? null,
+    scheduledSessionId,
+  );
+  return <SessionView session={session} />;
 }

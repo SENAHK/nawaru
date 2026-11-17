@@ -88,9 +88,9 @@ export default function ExerciseDetailScreen() {
         <AppText color="textSecondary">{exercise.description}</AppText>
       </View>
 
-      {/* Provisional entry point until Today and Session screens exist. */}
+      {/* Provisional: adds the exercise to today's free session until the picker sheet (S6) exists. */}
       <Button
-        title="Start with timer"
+        title="Add to today and start"
         size="lg"
         onPress={() =>
           router.push({

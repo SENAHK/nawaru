@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 
 import type { LogRow } from '@/features/timer/rows';
 import type { TimerDosage } from '@/features/timer/types';
@@ -6,9 +6,10 @@ import { today } from '@/lib/dates';
 
 import { db, schema } from '../client';
 import type { DosageScheme } from '../enums';
+import { requireAthlete } from './profile';
 
 const { activeTimer, equipment, exercise, exerciseEquipment, exerciseLog, setLog } = schema;
-const { userProfile, workout } = schema;
+const { prescription, reference, userProfile, workout } = schema;
 
 /** Defaults for a free exercise with no history (docs/screens.md §3.3). */
 const defaultDosage: Record<DosageScheme, Omit<TimerDosage, 'scheme' | 'side'>> = {
@@ -20,20 +21,9 @@ const defaultDosage: Record<DosageScheme, Omit<TimerDosage, 'scheme' | 'side'>> 
   free_duration: { totalDurationS: 3600 },
 };
 
-/**
- * The athlete's profile. Provisional: until onboarding exists, a default
- * profile is created on first use.
- */
-export function ensureAthlete() {
-  const [existing] = db.select().from(userProfile).where(eq(userProfile.isCoach, false)).limit(1).all();
-  if (existing) return existing;
-  const [created] = db.insert(userProfile).values({ displayName: 'Me' }).returning().all();
-  return created;
-}
-
 /** Adds an exercise to today's free session (created if needed) and returns the log id. */
 export function createFreeExerciseLog(exerciseId: string): string {
-  const athlete = ensureAthlete();
+  const athlete = requireAthlete();
   const [target] = db.select().from(exercise).where(eq(exercise.id, exerciseId)).limit(1).all();
   if (!target) throw new Error(`Unknown exercise ${exerciseId}`);
 
@@ -54,7 +44,7 @@ export function createFreeExerciseLog(exerciseId: string): string {
       .all();
     freeWorkout ??= tx
       .insert(workout)
-      .values({ athleteId: athlete.id, performedOn: date, startedAt: Date.now() })
+      .values({ athleteId: athlete.id, performedOn: date })
       .returning()
       .all()[0];
 
@@ -122,7 +112,7 @@ export function loadLogSession(exerciseLogId: string): LogSessionData | null {
     .orderBy(asc(setLog.setIndex), asc(setLog.itemIndex))
     .all();
 
-  const athlete = ensureAthlete();
+  const athlete = requireAthlete();
   const { log } = row;
 
   return {
@@ -180,12 +170,78 @@ export function saveLogRows(exerciseLogId: string, rows: LogRow[]): void {
         )
         .run();
     }
+    createReferenceFromTest(tx, exerciseLogId, rows);
     tx.delete(activeTimer).run();
   });
 }
 
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * A test prescription turns its best successful set into a reference, used by
+ * every later prescription given in % (docs/specs.md §4, test phases).
+ */
+function createReferenceFromTest(tx: Transaction, exerciseLogId: string, rows: LogRow[]): void {
+  const [row] = tx
+    .select({ log: exerciseLog, athleteId: workout.athleteId, performedOn: workout.performedOn, isTest: prescription.isTest })
+    .from(exerciseLog)
+    .innerJoin(workout, eq(workout.id, exerciseLog.workoutId))
+    .leftJoin(prescription, eq(prescription.id, exerciseLog.prescriptionId))
+    .where(eq(exerciseLog.id, exerciseLogId))
+    .limit(1)
+    .all();
+  if (!row?.isTest) return;
+
+  // Re-saving the same test replaces the reference it produced.
+  const previous = tx
+    .select({ id: setLog.id })
+    .from(setLog)
+    .where(eq(setLog.exerciseLogId, exerciseLogId))
+    .all()
+    .map((set) => set.id);
+  if (previous.length > 0) {
+    tx.update(reference)
+      .set({ deletedAt: Date.now() })
+      .where(and(inArray(reference.sourceSetLogId, previous), isNull(reference.deletedAt)))
+      .run();
+  }
+
+  const best = rows
+    .filter((set) => set.result === 'success' && set.loadKg != null)
+    .sort((a, b) => (b.loadKg ?? 0) - (a.loadKg ?? 0))[0];
+  if (!best || best.loadKg == null) return;
+
+  const [source] = tx
+    .select({ id: setLog.id })
+    .from(setLog)
+    .where(
+      and(
+        eq(setLog.exerciseLogId, exerciseLogId),
+        isNull(setLog.deletedAt),
+        eq(setLog.setIndex, best.setIndex),
+      ),
+    )
+    .limit(1)
+    .all();
+
+  tx.insert(reference)
+    .values({
+      athleteId: row.athleteId,
+      exerciseId: row.log.exerciseId,
+      gripType: row.log.gripType,
+      fingerCount: row.log.fingerCount,
+      side: row.log.side,
+      edgeMm: row.log.edgeMm,
+      durationS: row.log.durationS,
+      valueKg: best.loadKg,
+      measuredOn: row.performedOn,
+      sourceSetLogId: source?.id ?? null,
+    })
+    .run();
+}
+
 export function setTimerSoundsEnabled(enabled: boolean): void {
-  const athlete = ensureAthlete();
+  const athlete = requireAthlete();
   db.update(userProfile).set({ timerSoundsEnabled: enabled }).where(eq(userProfile.id, athlete.id)).run();
 }
 

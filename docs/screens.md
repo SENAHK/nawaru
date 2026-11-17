@@ -68,7 +68,7 @@ Un seul écran, défilant.
 | Route grades | SegmentedControl `French` / `YDS` | `French` | Oui |
 | Bodyweight | Stepper décimal | vide | Non (texte d'aide : "Used to show hangs as % of bodyweight") |
 
-Action : `Get started` crée le `user_profile` et ouvre Today. Le seed (bibliothèque, coach factice, programme de démo) est déjà en base au premier lancement de l'app.
+Action : `Get started` crée le `user_profile`, inscrit l'athlète aux programmes de son coach (début le lundi de la semaine en cours) et ouvre Today. Le seed (bibliothèque, coach factice, programme de démo) est déjà en base au premier lancement de l'app.
 
 ### S1 Today
 

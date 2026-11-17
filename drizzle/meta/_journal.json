@@ -15,6 +15,13 @@
       "when": 1794848163507,
       "tag": "0001_exercise_log_dosage",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794871031113,
+      "tag": "0002_reset_pre_onboarding_data",
+      "breakpoints": true
     }
   ]
 }

@@ -7,3 +7,31 @@ export function toCalendarDate(date: Date): string {
 }
 
 export const today = () => toCalendarDate(new Date());
+
+/** Parses a YYYY-MM-DD calendar date at local midnight. */
+export function parseCalendarDate(date: string): Date {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+export function addDays(date: string, days: number): string {
+  const value = parseCalendarDate(date);
+  value.setDate(value.getDate() + days);
+  return toCalendarDate(value);
+}
+
+/** ISO weekday: 1 = Monday … 7 = Sunday. */
+export function isoWeekday(date: string): number {
+  return ((parseCalendarDate(date).getDay() + 6) % 7) + 1;
+}
+
+/** The Monday of the week containing `date`. */
+export function mondayOf(date: string): string {
+  return addDays(date, 1 - isoWeekday(date));
+}
+
+/** Whole days from `from` to `to` (negative if `to` is earlier). */
+export function diffDays(from: string, to: string): number {
+  const ms = parseCalendarDate(to).getTime() - parseCalendarDate(from).getTime();
+  return Math.round(ms / 86_400_000);
+}
