@@ -91,3 +91,10 @@ export function formatWeekRange(from: string, to: string): string {
   }
   return `${dayMonthFormat.format(start)} – ${dayMonthFormat.format(end)}`;
 }
+
+const shortDateFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
+
+/** "3 Feb". */
+export function formatShortDate(date: string): string {
+  return shortDateFormat.format(new Date(`${date}T00:00:00`));
+}

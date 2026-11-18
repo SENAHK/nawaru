@@ -342,18 +342,20 @@ Un aperçu `DosageSummary` est affiché en haut et mis à jour en direct. Le bou
 Média (emplacement réservé, ratio 16:9), nom, catégorie, schéma, description, instructions, muscles (principaux puis secondaires), équipement. Étoile favori dans l'en-tête, bouton `Add to today` (ouvre S6 à l'étape du dosage).
 
 Sections dynamiques :
-- **History** : les 5 dernières réalisations (date, résumé, charge), et `See all` qui ouvre l'historique dans S12.
+- **History** : les 5 dernières réalisations (date, résumé, charge), et `See all` qui ouvre l'onglet Progress sur l'historique de cet exercice.
 - **References** (si `is_testable`) : dernières références par combinaison.
 
 ### S12 Progress
 
 1. **Max hangs** (premier bloc, toujours visible)
-   - Sélecteur de combinaison : prise × bord × durée (par défaut, la plus utilisée).
-   - Graphique en courbe : charge dans le temps (tous les sets réussis des exercices isométriques de cette combinaison, meilleur set par jour), avec les références marquées par un losange.
-   - Toggle `kg` / `% BW` (visible seulement si le poids de corps est renseigné).
-   - Sous le graphique : record (`Best: +26 kg · 3 Feb`) et progression sur 8 semaines (`+4 kg`).
-2. **Exercise history** : recherche d'un exercice, puis la liste de toutes ses réalisations (plus récentes en premier), avec un badge `PR` sur le record.
-3. **Consistency** : barres hebdomadaires sur les 8 dernières semaines (séances faites / prévues).
+   - Sélecteur de combinaison : prise × bord × durée (par défaut, la plus utilisée), en pastilles ; une seule combinaison s'affiche en texte. La durée est celle de la prescription (`exercise_log.duration_s`).
+   - Graphique en courbe : charge dans le temps (tous les sets réussis des exercices isométriques de cette combinaison, meilleur set par jour), avec les références marquées par un losange. Un tap (ou un glissé) sur le graphique affiche le jour le plus proche : date, valeur, et la référence de ce jour s'il y en a une ; la lecture reste jusqu'au tap suivant. Légende sous le graphique.
+   - Toggle `kg` / `% BW` (visible seulement si le poids de corps est renseigné). `% BW` = (poids de corps + charge ajoutée) / poids de corps.
+   - Sous le graphique, deux tuiles : `Best` (valeur et date) et `Last 8 weeks` (dernier point moins le premier point des 8 dernières semaines ; `Not enough data` avec moins de deux points).
+2. **Exercise history** : sélecteur d'exercice (la liste de S11 dans une feuille), par défaut le dernier exercice logué ou celui ouvert depuis `See all` dans S11b. Liste de toutes ses réalisations avec au moins un set (plus récentes en premier) : date, dosage, nombre de sets et d'échecs, meilleure charge réussie, badge `PR` sur la première fois où la meilleure charge a été atteinte. Un tap ouvre le log (S5).
+3. **Consistency** : barres hebdomadaires sur les 8 dernières semaines : séances prévues en contour, faites en plein. Un tap sur une semaine affiche `Week of 16 Nov: 2 / 3 sessions` (semaine en cours par défaut). Masqué s'il n'y a aucune séance prévue sur la période.
+
+Les graphiques sont dessinés avec `react-native-svg` (courbe) et des vues (barres), sans bibliothèque de graphiques.
 
 **État vide** : `No hangs logged yet` + `Log a max hang test to start tracking.`
 

@@ -14,10 +14,12 @@ type SheetProps = {
   footer?: ReactNode;
   /** Called once the sheet is fully closed (navigate from here, not before). */
   onDismiss?: () => void;
+  /** False when the content scrolls by itself (a list). */
+  scroll?: boolean;
 };
 
 /** Native iOS page sheet, dismissed by swiping down or "Done" (design-system BottomSheet). */
-export function Sheet({ visible, title, onClose, children, footer, onDismiss }: SheetProps) {
+export function Sheet({ visible, title, onClose, children, footer, onDismiss, scroll = true }: SheetProps) {
   const { colors } = useTheme();
   return (
     <Modal
@@ -34,9 +36,13 @@ export function Sheet({ visible, title, onClose, children, footer, onDismiss }: 
           {footer}
           <Button title="Done" variant="ghost" onPress={onClose} />
         </View>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          {children}
-        </ScrollView>
+        {scroll ? (
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+            {children}
+          </ScrollView>
+        ) : (
+          <View style={styles.fixed}>{children}</View>
+        )}
       </View>
     </Modal>
   );
@@ -56,4 +62,5 @@ const styles = StyleSheet.create({
   },
   title: { flex: 1 },
   content: { padding: space[4], gap: space[4] },
+  fixed: { flex: 1, paddingHorizontal: space[4], paddingTop: space[3] },
 });

@@ -180,6 +180,13 @@ export default function ExerciseDetailScreen() {
         ) : (
           <AppText color="textSecondary">No logs yet</AppText>
         )}
+        {history.length > 0 ? (
+          <Button
+            title="See all"
+            variant="ghost"
+            onPress={() => router.navigate({ pathname: '/progress', params: { exerciseId: exercise.id } })}
+          />
+        ) : null}
       </Section>
 
       {exercise.isTestable ? (

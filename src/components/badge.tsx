@@ -10,6 +10,7 @@ const variants = {
   missed: 'missed',
   paused: 'missed',
   test: 'info',
+  pr: 'accentText',
 } as const satisfies Record<string, keyof ColorTokens>;
 
 export function Badge({ variant, label }: { variant: keyof typeof variants; label: string }) {

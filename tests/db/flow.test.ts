@@ -33,6 +33,13 @@ import {
   stopEnrollment,
 } from '../../src/db/queries/enrollment';
 import { getLibrary, isFavorite, toggleFavorite } from '../../src/db/queries/library';
+import {
+  getConsistencySessions,
+  getExerciseHistory,
+  getHangOverview,
+  getHangSeries,
+  getLastLoggedExercise,
+} from '../../src/db/queries/progress';
 import { seedDatabase } from '../../src/db/seed';
 import { addClimbRow, buildPlannedRows, removeClimbRow } from '../../src/features/timer/rows';
 import { addDays, mondayOf, today } from '../../src/lib/dates';
@@ -301,5 +308,32 @@ describe('library', () => {
     assert.equal(isFavorite(first.id), true);
     assert.equal(getLibrary().filter((item) => item.favorite).length, 1);
     assert.equal(db.select().from(schema.exerciseFavorite).all().length, 1);
+  });
+});
+
+describe('progress', () => {
+  it('charts the max hang test: one combination, its best set and its reference', () => {
+    const { combos } = getHangOverview();
+    const test = combos.find((combo) => combo.durationS === 10 && combo.edgeMm === 20)!;
+    assert.deepEqual([test.gripType, test.fingerCount], ['half_crimp', 'four']);
+    const series = getHangSeries(test);
+    // The missed Monday test was performed today: points and reference carry that date.
+    assert.deepEqual(series.points, [{ date: today(), kg: 24 }]);
+    assert.deepEqual(series.references, [{ date: today(), kg: 24 }]);
+  });
+
+  it('lists the history of an exercise with its record', () => {
+    const last = getLastLoggedExercise();
+    assert.ok(last);
+    const [hangTest] = db.select().from(schema.exercise).where(eq(schema.exercise.slug, 'max-hang-test')).all();
+    const history = getExerciseHistory(hangTest.id);
+    assert.equal(history.length, 1);
+    assert.deepEqual([history[0].sets, history[0].fails, history[0].bestKg, history[0].pr], [3, 1, 24, true]);
+  });
+
+  it('feeds the consistency bars from the scheduled sessions', () => {
+    const sessions = getConsistencySessions(today());
+    assert.ok(sessions.length > 0);
+    assert.ok(sessions.every((session) => session.scheduledDate <= addDays(mondayOf(today()), 6)));
   });
 });
