@@ -1,0 +1,18 @@
+# Publishes an over-the-air update to the installed app on every push to
+# master (docs/specs.md, environment). Native changes are not covered: bump
+# "version" in app.json and rebuild instead, so the update never reaches an
+# incompatible build (runtimeVersion policy "appVersion").
+name: Update production
+
+on:
+  push:
+    branches: ['master']
+
+jobs:
+  update_production:
+    name: Publish update to production
+    type: update
+    environment: production
+    params:
+      platform: ios
+      channel: production

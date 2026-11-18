@@ -293,7 +293,8 @@ L'app se rémunère par un abonnement coach, qui déverrouille l'accès quel que
 | Plateformes | iOS uniquement en V1 ; Android plus tard |
 | Audio du timer | `expo-audio`, avec lecture en arrière-plan (`enableBackgroundPlayback`, `shouldPlayInBackground`) et en mode silencieux (`playsInSilentMode`) |
 | Effet verre | `expo-glass-effect` conservé, limité à la navigation (voir `design-system.md` §5) |
-| Environnement de développement | Expo Go dans un premier temps : pas de module natif hors Expo Go. L'audio en arrière-plan et la Live Activity (`expo-widgets`) attendent le passage à un development build |
+| Environnement de développement | Development build (`expo-dev-client`) compilé localement avec Xcode et un Apple ID gratuit (`npx expo run:ios --device`, à réinstaller tous les 7 jours). Il apporte l'audio en arrière-plan ; la Live Activity (`expo-widgets`) suivra. Expo Go reste utilisable pour tout le reste. Le compte Apple Developer payant ne sera nécessaire que pour EAS Build, TestFlight et l'App Store |
+| Mises à jour sans le Mac | L'app du quotidien est un build Release local (`npx expo run:ios --device --configuration Release`) qui suit le canal EAS Update `production`. Chaque push sur `master` publie une mise à jour JS (`.eas/workflows/update-production.yml`), appliquée au relancement de l'app. `runtimeVersion` suit `version` : un changement natif (module, plugin, permission) demande d'augmenter `version` et de recompiler |
 | Timer et log | Un seul écran (timer en haut, sets en dessous), avec un mode focus plein écran |
 | Écran verrouillé | Live Activity via `expo-widgets` (voir `timer.md` §8) |
 | Pause d'un programme | Les séances sont masquées pendant la pause et ne deviennent pas manquées ; le décalage est proposé à la reprise |

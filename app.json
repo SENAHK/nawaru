@@ -8,6 +8,7 @@
     "scheme": "nawaru",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "app.nawaru.ios",
       "icon": "./assets/expo.icon"
     },
     "android": {
@@ -34,7 +35,13 @@
         }
       ],
       "expo-sqlite",
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "enableBackgroundPlayback": true
+        }
+      ],
       "expo-sharing",
       "expo-asset"
     ],
@@ -52,6 +59,15 @@
         "projectId": "e171c374-4bc8-40ad-94a6-f1d972cc09d8"
       }
     },
-    "owner": "nawaru"
+    "owner": "nawaru",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e171c374-4bc8-40ad-94a6-f1d972cc09d8",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
+    }
   }
 }

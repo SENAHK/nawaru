@@ -16,7 +16,7 @@ import {
   type SavedReference,
 } from '@/db/queries/log';
 
-import { loadSounds, playCue, unloadSounds } from './audio';
+import { keepAwakeWithSilence, loadSounds, playCue, stopSilence, unloadSounds } from './audio';
 import { buildSteps, setCount, withSetCount } from './build-steps';
 import { computeCues } from './cues';
 import * as machine from './machine';
@@ -125,20 +125,27 @@ function persist() {
 
 function startLoop() {
   if (interval || !session) return;
-  if (session.settings.soundsEnabled) loadSounds(session.settings.volume);
+  if (session.settings.soundsEnabled) {
+    loadSounds(session.settings.volume);
+    keepAwakeWithSilence();
+  }
   lastTickAt = Date.now();
   interval = setInterval(onTick, TICK_MS);
 }
 
+/** Paused, done or stopped: nothing to wait for, the app may be suspended. */
 function stopLoop() {
   if (interval) clearInterval(interval);
   interval = null;
+  stopSilence();
 }
 
 function onTick() {
   const timer = session?.timer;
   if (!timer || timer.status !== 'running') return stopLoop();
   const now = Date.now();
+  // Restarts the silence loop if iOS stopped it (headphones unplugged, call).
+  if (session?.settings.soundsEnabled) keepAwakeWithSilence();
   const next = machine.tick(timer, now);
   commitTimer(next, { prevNow: lastTickAt, now });
   lastTickAt = now;
@@ -306,7 +313,12 @@ export function toggleSounds(): void {
   const soundsEnabled = !session.settings.soundsEnabled;
   session = { ...session, settings: { ...session.settings, soundsEnabled } };
   setTimerSoundsEnabled(soundsEnabled);
-  if (soundsEnabled && session.timer?.status === 'running') loadSounds(session.settings.volume);
+  if (soundsEnabled && session.timer?.status === 'running') {
+    loadSounds(session.settings.volume);
+    keepAwakeWithSilence();
+  }
+  // Without sounds the app may sleep: the timer catches up when it comes back.
+  if (!soundsEnabled) stopSilence();
   persist();
   emit();
 }

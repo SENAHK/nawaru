@@ -287,11 +287,11 @@ src/features/timer/
 tests/timer/          # tests unitaires des fichiers purs (npm test)
 ```
 
-Les fichiers purs sont couverts par des tests unitaires (`npm test`, lanceur de tests de Node via `tsx`). La boucle de silence et la Live Activity (`live-activity.tsx`) seront ajoutées avec le development build.
+Les fichiers purs sont couverts par des tests unitaires (`npm test`, lanceur de tests de Node via `tsx`). La boucle de silence est dans `audio.ts` (`keepAwakeWithSilence`, `stopSilence`, fichier `assets/sounds/silence.wav`) : lancée quand le timer passe en `running` avec les sons activés, relancée à chaque `tick` si iOS l'a arrêtée, arrêtée en pause, à la fin et quand les sons sont coupés. La Live Activity (`live-activity.tsx`) viendra ensuite.
 
 ## 10. À valider au prototype
 
-Le développement commence dans Expo Go, où le timer fonctionne au premier plan seulement (sons compris) et se recale au retour dans l'app. Les points ci-dessous demandent un development build et seront validés à ce moment-là, dans cet ordre, sur un iPhone réel :
+Le développement a commencé dans Expo Go, où le timer fonctionne au premier plan seulement (sons compris) et se recale au retour dans l'app. Les points ci-dessous demandent le development build (compilé localement avec Xcode et un Apple ID gratuit : `npx expo run:ios --device`, bundle `app.nawaru.ios`, à réinstaller tous les 7 jours) et sont à valider dans cet ordre, sur un iPhone réel :
 
 1. Un Repeaters complet (environ 20 min), écran verrouillé : tous les bips jouent, à l'heure.
 2. Idem avec de la musique en lecture dans une autre app : les bips se superposent, la musique ne s'arrête pas.
