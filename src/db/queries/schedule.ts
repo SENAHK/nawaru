@@ -76,6 +76,49 @@ export function latestReferenceKg(reader: Reader, athleteId: string, key: GripKe
   return row?.valueKg ?? null;
 }
 
+/**
+ * Best successful load of the last log of an exercise done with the same grip
+ * and edge (docs/data-model.md §9, pre-filling the log).
+ */
+export function lastLoadKg(
+  reader: Reader,
+  athleteId: string,
+  key: { exerciseId: string; gripType: GripType | null; fingerCount: FingerCount | null; edgeMm: number | null },
+  excludeLogId?: string,
+): number | null {
+  const same = <T>(column: Parameters<typeof eq>[0], value: T | null) =>
+    value == null ? isNull(column) : eq(column, value);
+  const logs = reader
+    .select({ id: exerciseLog.id })
+    .from(exerciseLog)
+    .innerJoin(workout, eq(workout.id, exerciseLog.workoutId))
+    .where(
+      and(
+        eq(workout.athleteId, athleteId),
+        isNull(workout.deletedAt),
+        isNull(exerciseLog.deletedAt),
+        eq(exerciseLog.exerciseId, key.exerciseId),
+        same(exerciseLog.gripType, key.gripType),
+        same(exerciseLog.fingerCount, key.fingerCount),
+        same(exerciseLog.edgeMm, key.edgeMm),
+      ),
+    )
+    .orderBy(desc(workout.performedOn), desc(exerciseLog.updatedAt))
+    .limit(5)
+    .all();
+
+  for (const log of logs) {
+    if (log.id === excludeLogId) continue;
+    const [best] = reader
+      .select({ loadKg: sql<number | null>`max(${setLog.loadKg})` })
+      .from(setLog)
+      .where(and(eq(setLog.exerciseLogId, log.id), isNull(setLog.deletedAt), eq(setLog.result, 'success')))
+      .all();
+    if (best?.loadKg != null) return best.loadKg;
+  }
+  return null;
+}
+
 const dosageOf = (
   scheme: TimerDosage['scheme'],
   row: Omit<TimerDosage, 'scheme' | 'side'> & { side: Side | null },
@@ -109,6 +152,7 @@ function plannedItems(athleteId: string, plannedSessionIds: string[]): Map<strin
   for (const { rx, exercise: target } of rows) {
     const referenceKg =
       rx.loadMode === 'percent_reference' ? latestReferenceKg(db, athleteId, rx) : null;
+    const lastKg = rx.loadMode === 'none' ? lastLoadKg(db, athleteId, rx) : null;
     const item: SessionItem = {
       key: rx.id,
       exerciseLogId: null,
@@ -116,7 +160,7 @@ function plannedItems(athleteId: string, plannedSessionIds: string[]): Map<strin
       name: target.name,
       category: target.category,
       summary: fullDosageSummary(dosageOf(target.dosageScheme, rx), rx),
-      loadLabel: resolveLoad(rx.loadMode, rx.loadValue, referenceKg, null).label,
+      loadLabel: resolveLoad(rx.loadMode, rx.loadValue, referenceKg, lastKg).label,
       note: rx.notes,
       isTest: rx.isTest,
       state: 'todo',
@@ -394,6 +438,7 @@ export function ensureWorkout(scheduledSessionId: string, start: boolean): strin
           prescriptions.map((rx, sort) => {
             const referenceKg =
               rx.loadMode === 'percent_reference' ? latestReferenceKg(tx, athlete.id, rx) : null;
+            const lastKg = rx.loadMode === 'none' ? lastLoadKg(tx, athlete.id, rx) : null;
             return {
               workoutId: created.id,
               exerciseId: rx.exerciseId,
@@ -409,7 +454,7 @@ export function ensureWorkout(scheduledSessionId: string, start: boolean): strin
               itemsPerRound: rx.itemsPerRound,
               slotDurationS: rx.slotDurationS,
               totalDurationS: rx.totalDurationS,
-              targetLoadKg: resolveLoad(rx.loadMode, rx.loadValue, referenceKg, null).kg,
+              targetLoadKg: resolveLoad(rx.loadMode, rx.loadValue, referenceKg, lastKg).kg,
               gripType: rx.gripType,
               fingerCount: rx.fingerCount,
               side: rx.side,
@@ -455,4 +500,87 @@ export function findExerciseLog(workoutId: string, prescriptionId: string): stri
     .limit(1)
     .all();
   return row?.id ?? null;
+}
+
+/** Changes the date a workout was performed on (the session keeps its planned date). */
+export function setPerformedOn(workoutId: string, date: string): void {
+  db.update(workout).set({ performedOn: date }).where(eq(workout.id, workoutId)).run();
+}
+
+/**
+ * "Delete log": soft-deletes the workout, its exercise logs and sets, and the
+ * references they produced. The session goes back to planned or missed.
+ */
+export function deleteWorkout(workoutId: string): void {
+  const now = Date.now();
+  db.transaction((tx) => {
+    const logIds = tx
+      .select({ id: exerciseLog.id })
+      .from(exerciseLog)
+      .where(eq(exerciseLog.workoutId, workoutId))
+      .all()
+      .map((log) => log.id);
+    if (logIds.length > 0) {
+      const setIds = tx
+        .select({ id: setLog.id })
+        .from(setLog)
+        .where(inArray(setLog.exerciseLogId, logIds))
+        .all()
+        .map((set) => set.id);
+      if (setIds.length > 0) {
+        tx.update(reference)
+          .set({ deletedAt: now })
+          .where(and(inArray(reference.sourceSetLogId, setIds), isNull(reference.deletedAt)))
+          .run();
+      }
+      tx.update(setLog)
+        .set({ deletedAt: now })
+        .where(and(inArray(setLog.exerciseLogId, logIds), isNull(setLog.deletedAt)))
+        .run();
+      tx.update(exerciseLog)
+        .set({ deletedAt: now })
+        .where(and(eq(exerciseLog.workoutId, workoutId), isNull(exerciseLog.deletedAt)))
+        .run();
+    }
+    // The unique link to the scheduled session is released so it can be logged again.
+    tx.update(workout)
+      .set({ deletedAt: now, scheduledSessionId: null })
+      .where(eq(workout.id, workoutId))
+      .run();
+  });
+}
+
+export type ActiveWorkout = {
+  workoutId: string;
+  scheduledSessionId: string | null;
+  title: string;
+  startedAt: number;
+};
+
+/** The workout started and not finished, shown in the session bar. */
+export function getActiveWorkout(): ActiveWorkout | null {
+  const athlete = requireAthlete();
+  const [row] = db
+    .select({ workout, name: plannedSession.name })
+    .from(workout)
+    .leftJoin(scheduledSession, eq(scheduledSession.id, workout.scheduledSessionId))
+    .leftJoin(plannedSession, eq(plannedSession.id, scheduledSession.plannedSessionId))
+    .where(
+      and(
+        eq(workout.athleteId, athlete.id),
+        isNull(workout.deletedAt),
+        sql`${workout.startedAt} is not null`,
+        isNull(workout.endedAt),
+      ),
+    )
+    .orderBy(desc(workout.startedAt))
+    .limit(1)
+    .all();
+  if (!row?.workout.startedAt) return null;
+  return {
+    workoutId: row.workout.id,
+    scheduledSessionId: row.workout.scheduledSessionId,
+    title: row.workout.scheduledSessionId ? (row.name ?? 'Session') : 'Free session',
+    startedAt: row.workout.startedAt,
+  };
 }

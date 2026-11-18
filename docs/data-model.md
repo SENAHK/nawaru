@@ -285,7 +285,7 @@ Une validation côté code (schéma Zod par `dosage_scheme`) garantit que les co
 
 | Besoin | Calcul |
 | --- | --- |
-| Pré-remplissage du log | 1) prescription (kg ou % × référence) → 2) dernier `exercise_log` du même exercice avec mêmes prise et bord → 3) vide |
+| Pré-remplissage du log | 1) prescription (kg ou % × référence) → 2) dernier `exercise_log` du même exercice avec mêmes prise et bord : meilleure charge de ses sets réussis (`lastLoadKg`, affichée `+5 kg · last`) → 3) vide. S6 reprend aussi le dosage du dernier log de l'exercice |
 | Statut d'une séance | `scheduled_session` + état du `workout` lié + pause de l'inscription (§6) |
 | Stats max hangs | `set_log` des exercices `isometric` filtrés, groupés par prise × bord × durée ; % du poids de corps si `bodyweight_kg` est renseigné |
 | Timer | Liste d'étapes générée depuis la prescription (préparation, ON, OFF, repos, changement de côté). L'état actif est persisté dans la table locale `active_timer` (une ligne, non synchronisée) pour que l'affichage se recale au retour au premier plan. Détail dans `timer.md` |

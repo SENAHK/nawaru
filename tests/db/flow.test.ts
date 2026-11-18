@@ -9,18 +9,22 @@ import { before, describe, it } from 'node:test';
 import { eq } from 'drizzle-orm';
 
 import { db, schema } from '../../src/db/client';
-import { createFreeExerciseLog, loadLogSession, saveLogRows } from '../../src/db/queries/log';
+import { addFreeExercise, getAddExerciseDraft, loadLogSession, saveLog } from '../../src/db/queries/log';
 import { completeOnboarding, getAthlete } from '../../src/db/queries/profile';
 import {
+  deleteWorkout,
   ensureWorkout,
   findExerciseLog,
   finishWorkout,
+  getActiveWorkout,
   getFreeWorkouts,
   getScheduledSessions,
   getTodayData,
+  setPerformedOn,
+  startWorkout,
 } from '../../src/db/queries/schedule';
 import { seedDatabase } from '../../src/db/seed';
-import { buildPlannedRows } from '../../src/features/timer/rows';
+import { addClimbRow, buildPlannedRows, removeClimbRow } from '../../src/features/timer/rows';
 import { addDays, mondayOf, today } from '../../src/lib/dates';
 
 const monday = mondayOf(today());
@@ -85,8 +89,14 @@ describe('database flow', () => {
       result: index === 1 ? ('fail' as const) : ('success' as const),
       done: true,
     }));
-    saveLogRows(exerciseLogId, rows);
-    saveLogRows(exerciseLogId, rows); // saving twice must not duplicate anything
+    const details = { ...log.details, effortValue: 9, notes: '  Felt strong  ' };
+    saveLog(exerciseLogId, rows, details, log.gradeSystem);
+    // Saving twice must not duplicate anything.
+    const created = saveLog(exerciseLogId, rows, details, log.gradeSystem);
+    assert.equal(created?.valueKg, 24);
+
+    const saved = loadLogSession(exerciseLogId)!;
+    assert.deepEqual([saved.details.effortValue, saved.details.notes, saved.savedSets.length], [9, 'Felt strong', 3]);
 
     const references = db.select().from(schema.reference).all().filter((r) => r.deletedAt == null);
     assert.equal(references.length, 1);
@@ -122,14 +132,76 @@ describe('database flow', () => {
     assert.notEqual(withWorkout.status, 'in_progress');
   });
 
-  it('adds a free exercise to today', () => {
+  it('adds a free exercise to today, pre-filled from the last time', () => {
     const [deadlift] = db.select().from(schema.exercise).where(eq(schema.exercise.slug, 'deadlift')).all();
-    const exerciseLogId = createFreeExerciseLog(deadlift.id);
-    createFreeExerciseLog(deadlift.id);
+    const draft = getAddExerciseDraft(deadlift.id)!;
+    assert.equal(draft.source, 'default');
+    const exerciseLogId = addFreeExercise(null, { ...draft, dosage: { ...draft.dosage, reps: 5 } });
+    const log = loadLogSession(exerciseLogId)!;
+    assert.equal(log.dosage.restBetweenSetsS, 120);
+    assert.equal(log.prescribed, null);
+    saveLog(
+      exerciseLogId,
+      buildPlannedRows(log.dosage, 80).map((row) => ({ ...row, done: true })),
+      log.details,
+      log.gradeSystem,
+    );
+
+    const next = getAddExerciseDraft(deadlift.id)!;
+    assert.deepEqual([next.source, next.dosage.reps, next.targetLoadKg], ['last', 5, 80]);
+    addFreeExercise(null, next);
 
     const free = getFreeWorkouts({ from: today(), to: today() });
     assert.equal(free.length, 1);
-    assert.deepEqual(free[0].items.map((item) => item.summary), ['8 × 3', '8 × 3']);
-    assert.equal(loadLogSession(exerciseLogId)?.dosage.restBetweenSetsS, 120);
+    assert.deepEqual(free[0].items.map((item) => item.summary), ['5 × 3', '5 × 3']);
+  });
+
+  it('logs climbs with grades on a free duration exercise', () => {
+    const [bouldering] = db
+      .select()
+      .from(schema.exercise)
+      .where(eq(schema.exercise.dosageScheme, 'free_duration'))
+      .all();
+    const exerciseLogId = addFreeExercise(null, getAddExerciseDraft(bouldering.id)!);
+    const log = loadLogSession(exerciseLogId)!;
+    let rows = addClimbRow(addClimbRow(addClimbRow(buildPlannedRows(log.dosage, null))));
+    rows = removeClimbRow(rows, rows[2].key).map((row, index) => ({ ...row, grade: index > 0 ? `7A${index}` : null }));
+    assert.deepEqual(rows.map((row) => row.setIndex), [1, 2, 3]);
+    saveLog(exerciseLogId, rows, log.details, log.gradeSystem);
+
+    const saved = loadLogSession(exerciseLogId)!.savedSets;
+    assert.deepEqual(
+      saved.map((set) => [set.setIndex, set.grade, set.gradeSystem]),
+      [
+        [1, null, null],
+        [2, '7A1', 'font'],
+        [3, '7A2', 'font'],
+      ],
+    );
+  });
+
+  it('adds an exercise to a planned session, then moves and deletes its log', () => {
+    const date = addDays(monday, 14);
+    const [session] = getScheduledSessions({ from: date, to: date });
+    const [pullUps] = db.select().from(schema.exercise).where(eq(schema.exercise.slug, 'pull-ups')).all();
+    addFreeExercise({ scheduledSessionId: session.scheduledSessionId! }, getAddExerciseDraft(pullUps.id)!);
+
+    let [after] = getScheduledSessions({ scheduledSessionId: session.scheduledSessionId! });
+    assert.equal(after.items.length, session.items.length + 1);
+    assert.equal(after.items.at(-1)?.name, 'Pull-ups');
+
+    startWorkout(after.workoutId!);
+    assert.equal(getActiveWorkout()?.workoutId, after.workoutId);
+
+    setPerformedOn(after.workoutId!, addDays(date, -1));
+    [after] = getScheduledSessions({ scheduledSessionId: session.scheduledSessionId! });
+    assert.deepEqual([after.scheduledDate, after.performedOn], [date, addDays(date, -1)]);
+
+    deleteWorkout(after.workoutId!);
+    [after] = getScheduledSessions({ scheduledSessionId: session.scheduledSessionId! });
+    assert.deepEqual([after.workoutId, after.items.length], [null, session.items.length]);
+    assert.equal(getActiveWorkout(), null);
+    // It can be logged again.
+    assert.ok(ensureWorkout(session.scheduledSessionId!, false));
   });
 });

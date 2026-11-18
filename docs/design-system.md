@@ -237,7 +237,7 @@ Liste fermée pour la V1. Chaque composant consomme uniquement des tokens.
 | `Badge` | `today` (neutre), `in_progress` (`accent`), `done` (`success`), `missed` (`missed`), `paused` (`missed`), `test` (`info`) | Majuscules, `label` ; une séance `planned` hors du jour courant n'a pas de badge |
 | `SegmentedControl` | 2 à 4 options | Bascule semaine / mois, échelle d'effort |
 | `Stepper` | entier, décimal (pas 0.5 ou 1 kg ; 1 rep ; 1s) | Boutons 48 pt de chaque côté, appui long = répétition, tap sur la valeur = saisie clavier numérique |
-| `GripPicker` | 3 étapes : type → doigts → main ; raccourcis des combinaisons récentes en tête | Résumé compact : "4F HC", "3F Drag", "L 2FM Pocket" |
+| `GripPicker` | Une feuille : combinaisons récentes en tête (un tap choisit et ferme), puis type de prise et doigts. La main vient du côté de la prescription | Résumé compact : "4F HC", "3F Drag", "L 2FM Pocket" |
 | `EffortPicker` | `rpe` (1 à 10, pas 0.5), `rir` (0 à 5), `feel` (Easy / Moderate / Hard / Very hard / Max) | Une rangée de pastilles, une seule sélection |
 | `SetRow` | à faire, réussi (numéro sur pastille `success`), échoué, en cours (bordure 2 pt `accent`) | Valeurs pré-remplies en `textSecondary`, modifiées en `textPrimary` |
 | `DosageSummary` | texte compact | `7s × 5 × 6 · 20 mm · 4F HC · +5 kg` |
@@ -245,7 +245,7 @@ Liste fermée pour la V1. Chaque composant consomme uniquement des tokens.
 | `BottomSheet` | hauteur auto, plein écran | Ajout d'exercice, filtres, sélecteurs |
 | `TabBar` | 5 onglets (`Today`, `Calendar`, `Programs`, `Library`, `Progress`) | Icône + libellé, actif en `accent` |
 | `EmptyState` | icône, titre, texte, action | |
-| `Toast` | info, succès, erreur | Bas d'écran, 3s |
+| `Toast` | info, succès | Bas d'écran au-dessus de la TabBar, 3s ; `showToast(text)` depuis n'importe quel écran |
 | `TimerPanel` | `compact` (au-dessus du log), `focus` (plein écran) ; phases §2.3 | Commandes `Back`, `Pause`, `Skip` ; barre de progression de l'étape ; ligne `Up next` |
 | `TimerLiveActivity` | écran verrouillé, Dynamic Island | Composants SwiftUI (`@expo/ui/swift-ui`), hors tokens RN : reprendre les couleurs de `timerPhases` |
 

@@ -1,4 +1,4 @@
-import type { Category, DosageScheme, EffortScale, Measure } from '@/db/enums';
+import type { Category, DosageScheme, EffortScale, FingerCount, GripType, Measure } from '@/db/enums';
 
 export const categoryLabels: Record<Category, string> = {
   fingers: 'Fingers',
@@ -42,4 +42,23 @@ export const schemeDescriptions: Record<DosageScheme, string> = {
   circuit: 'Rounds of several climbs, with rest between rounds.',
   slots: 'Fixed time slots, one attempt per slot.',
   free_duration: 'One total duration, results logged freely.',
+};
+
+export const gripTypeLabels: Record<GripType, string> = {
+  half_crimp: 'Half crimp',
+  full_crimp: 'Full crimp',
+  open_drag: 'Open drag',
+  pocket: 'Pocket',
+  pinch: 'Pinch',
+  sloper: 'Sloper',
+};
+
+export const fingerCountLabels: Record<FingerCount, string> = {
+  four: '4 fingers',
+  three_front: '3 front',
+  three_back: '3 back',
+  two_front: '2 front',
+  two_middle: '2 middle',
+  two_back: '2 back',
+  mono: 'Mono',
 };

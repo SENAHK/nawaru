@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { ChevronDown, ChevronRight, Moon, Settings } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { Button } from '@/components/button';
@@ -17,6 +17,8 @@ import { useSession } from '@/features/timer/store';
 import { today } from '@/lib/dates';
 import { formatAddedLoad, formatDate, formatGrip } from '@/lib/format';
 import { space, useTheme } from '@/theme';
+
+const HAS_SESSION_BAR = Platform.OS === 'ios' && parseInt(String(Platform.Version), 10) >= 26;
 
 // S1 Today (docs/screens.md).
 export default function TodayScreen() {
@@ -39,8 +41,8 @@ export default function TodayScreen() {
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}>
-        {/* Provisional: stands in for the persistent session bar. */}
-        {activeSession?.timer ? (
+        {/* The session bar sits above the tab bar from iOS 26; earlier versions resume from here. */}
+        {!HAS_SESSION_BAR && activeSession?.timer ? (
           <Button
             title={`Resume ${activeSession.exerciseName}`}
             size="lg"
@@ -86,8 +88,7 @@ export default function TodayScreen() {
         <Button
           title="Add exercise"
           variant="secondary"
-          // Provisional: the exercise picker sheet (S6) is not built yet.
-          onPress={() => router.navigate('/library')}
+          onPress={() => router.push('/add-exercise')}
         />
 
         {data.missed.length > 0 ? (

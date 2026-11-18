@@ -1,5 +1,6 @@
+import { DatePicker, Host } from '@expo/ui/swift-ui';
 import { router, Stack } from 'expo-router';
-import { Check, CircleAlert } from 'lucide-react-native';
+import { Check, CircleAlert, Trash2 } from 'lucide-react-native';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,17 +9,22 @@ import { Badge } from '@/components/badge';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
+import { IconButton } from '@/components/icon-button';
+import { showToast } from '@/components/toast';
 import {
+  deleteWorkout,
   ensureWorkout,
   findExerciseLog,
   finishWorkout,
+  setPerformedOn,
   startWorkout,
   type SessionItem,
   type SessionSummary,
 } from '@/db/queries/schedule';
-import { today } from '@/lib/dates';
+import { closeSession, getSession } from '@/features/timer/store';
+import { parseCalendarDate, toCalendarDate, today } from '@/lib/dates';
 import { formatDate } from '@/lib/format';
-import { space, useTheme } from '@/theme';
+import { radius, space, useTheme } from '@/theme';
 
 import { ExerciseLine, SessionOrigin, StatusBadge } from './session-parts';
 
@@ -29,10 +35,9 @@ const confirm = (title: string, action: string, onConfirm: () => void) =>
   ]);
 
 // S3 Session: same screen for a planned session and a free workout
-// (docs/screens.md). Editing the date, adding an exercise and deleting the
-// log come later.
+// (docs/screens.md).
 export function SessionView({ session }: { session: SessionSummary | null }) {
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const insets = useSafeAreaInsets();
 
   if (!session) return <EmptyState title="Session not found" />;
@@ -75,6 +80,7 @@ export function SessionView({ session }: { session: SessionSummary | null }) {
       const id = workoutId(false);
       if (id) finishWorkout(id);
       router.back();
+      showToast('Session saved');
     };
     if (notLogged > 0) {
       confirm(
@@ -85,9 +91,54 @@ export function SessionView({ session }: { session: SessionSummary | null }) {
     } else end();
   };
 
+  const addExercise = () => {
+    const open = () =>
+      router.push({
+        pathname: '/add-exercise',
+        params: session.workoutId
+          ? { workoutId: session.workoutId }
+          : { scheduledSessionId: session.scheduledSessionId ?? undefined },
+      });
+    if (future && !session.workoutId) confirm('Log this session early?', 'Log', open);
+    else open();
+  };
+
+  const remove = () => {
+    const { workoutId: id } = session;
+    if (!id) return;
+    Alert.alert(
+      'Delete log?',
+      'The exercises and sets logged in this session will be deleted. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete log',
+          style: 'destructive',
+          onPress: () => {
+            // A timer left running on one of these exercises goes too.
+            const running = getSession();
+            if (running && session.items.some((item) => item.exerciseLogId === running.exerciseLogId)) {
+              closeSession();
+            }
+            deleteWorkout(id);
+            // A free session no longer exists; a planned one goes back to planned or missed.
+            if (!session.scheduledSessionId) router.back();
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <View style={[styles.root, { backgroundColor: colors.bg }]}>
-      <Stack.Screen options={{ title: session.title }} />
+      <Stack.Screen
+        options={{
+          title: session.title,
+          headerRight: session.workoutId
+            ? () => <IconButton icon={Trash2} label="Delete log" onPress={remove} />
+            : undefined,
+        }}
+      />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
         <View style={styles.heading}>
           <View style={styles.row}>
@@ -104,11 +155,26 @@ export function SessionView({ session }: { session: SessionSummary | null }) {
             {session.program
               ? `Planned ${formatDate(session.scheduledDate)} · by ${session.program.author}`
               : formatDate(session.scheduledDate)}
-            {session.performedOn && session.performedOn !== session.scheduledDate
-              ? ` · Performed on ${formatDate(session.performedOn)}`
-              : ''}
           </AppText>
         </View>
+
+        {session.workoutId && session.performedOn ? (
+          <View style={[styles.performed, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <AppText color="textSecondary" style={styles.performedLabel}>
+              Performed on
+            </AppText>
+            <Host matchContents colorScheme={scheme}>
+              <DatePicker
+                selection={parseCalendarDate(session.performedOn)}
+                range={{ end: new Date() }}
+                displayedComponents={['date']}
+                onDateChange={(date) => {
+                  if (session.workoutId) setPerformedOn(session.workoutId, toCalendarDate(date));
+                }}
+              />
+            </Host>
+          </View>
+        ) : null}
 
         {session.items.map((item) => (
           <Card key={item.key}>
@@ -147,6 +213,8 @@ export function SessionView({ session }: { session: SessionSummary | null }) {
         {session.items.length === 0 ? (
           <AppText color="textSecondary">No exercises in this session.</AppText>
         ) : null}
+
+        <Button title="Add exercise" variant="secondary" onPress={addExercise} />
       </ScrollView>
 
       {status === 'done' ? null : (
@@ -169,6 +237,17 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
   state: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space[1] },
   note: { fontStyle: 'italic' },
+  performed: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    paddingVertical: space[2],
+    paddingHorizontal: space[3],
+    borderRadius: radius.lg,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+  },
+  performedLabel: { flex: 1 },
   footer: {
     paddingTop: space[3],
     paddingHorizontal: space[4],

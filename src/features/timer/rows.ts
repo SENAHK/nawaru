@@ -16,6 +16,8 @@ export type LogRow = {
   reps: number | null;
   durationS: number | null;
   loadKg: number | null;
+  /** Grade of the climb (circuit, slots, free duration). */
+  grade: string | null;
   result: SetResult;
   /** Done once the set has been performed (by the timer or by hand). */
   done: boolean;
@@ -44,6 +46,7 @@ export function buildPlannedRows(dosage: TimerDosage, loadKg: number | null): Lo
           reps: plannedReps(dosage),
           durationS: plannedDuration(dosage),
           loadKg,
+          grade: null,
           result: 'success',
           done: false,
           edited: false,
@@ -130,4 +133,34 @@ export function removeLastSetRows(rows: LogRow[]): LogRow[] | null {
   if (last <= 1) return null;
   if (rows.some((row) => row.setIndex === last && row.done)) return null;
   return rows.filter((row) => row.setIndex !== last);
+}
+
+/** Free duration: adds a climb after the session row (the timer only uses set 1). */
+export function addClimbRow(rows: LogRow[]): LogRow[] {
+  const next = rows.reduce((max, row) => Math.max(max, row.setIndex), 1) + 1;
+  return [
+    ...rows,
+    {
+      key: `climb:${next}:${Date.now()}`,
+      setIndex: next,
+      itemIndex: null,
+      side: null,
+      reps: null,
+      durationS: null,
+      loadKg: null,
+      grade: null,
+      result: 'success',
+      done: true,
+      edited: true,
+    },
+  ];
+}
+
+/** Removes a free-duration climb and renumbers the following ones. */
+export function removeClimbRow(rows: LogRow[], key: string): LogRow[] {
+  const removed = rows.find((row) => row.key === key);
+  if (!removed || removed.setIndex <= 1) return rows;
+  return rows
+    .filter((row) => row.key !== key)
+    .map((row) => (row.setIndex > removed.setIndex ? { ...row, setIndex: row.setIndex - 1 } : row));
 }

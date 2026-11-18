@@ -18,7 +18,6 @@ import {
   exerciseMusclesQuery,
   exerciseReferencesQuery,
 } from '@/db/queries/exercise';
-import { createFreeExerciseLog } from '@/db/queries/log';
 import { formatAddedLoad, formatDate, formatGrip } from '@/lib/format';
 import {
   categoryLabels,
@@ -88,16 +87,10 @@ export default function ExerciseDetailScreen() {
         <AppText color="textSecondary">{exercise.description}</AppText>
       </View>
 
-      {/* Provisional: adds the exercise to today's free session until the picker sheet (S6) exists. */}
       <Button
-        title="Add to today and start"
+        title="Add to today"
         size="lg"
-        onPress={() =>
-          router.push({
-            pathname: '/log/[exerciseLogId]',
-            params: { exerciseLogId: createFreeExerciseLog(exercise.id), autostart: '1' },
-          })
-        }
+        onPress={() => router.push({ pathname: '/add-exercise', params: { exerciseId: exercise.id } })}
       />
 
       <Section title="How to do it">

@@ -8,6 +8,7 @@ import { formatAddedLoad, formatDuration } from '@/lib/format';
 import { radius, space, touch, useTheme } from '@/theme';
 
 import type { LogRow } from './rows';
+import type { RowValues } from './store';
 
 type SetRowProps = {
   row: LogRow;
@@ -15,16 +16,23 @@ type SetRowProps = {
   /** Reps prescribed per set, shown as "3/5" for intervals. */
   targetReps: number | null;
   current: boolean;
-  onChange: (values: Partial<Pick<LogRow, 'reps' | 'durationS' | 'loadKg' | 'result'>>) => void;
+  /** Shown when the exercise records a load. */
+  showLoad: boolean;
+  /** Opens the grade picker; set when the exercise records grades. */
+  onPickGrade?: () => void;
+  onChange: (values: RowValues) => void;
 };
 
-export function SetRow({ row, scheme, targetReps, current, onChange }: SetRowProps) {
+export function SetRow({ row, scheme, targetReps, current, showLoad, onPickGrade, onChange }: SetRowProps) {
   const { colors } = useTheme();
   const muted = !row.edited && !row.done;
   const failed = row.result === 'fail';
   const number = row.itemIndex ?? row.setIndex;
   const sideLabel = row.side === 'left' ? 'L' : row.side === 'right' ? 'R' : null;
   const durationStep = scheme === 'free_duration' ? 60 : 1;
+  // Free duration: set 1 is the session time, the next ones are climbs.
+  const climb = scheme === 'free_duration' && row.setIndex > 1;
+  const climbNumber = climb ? row.setIndex - 1 : number;
 
   return (
     <View
@@ -41,14 +49,30 @@ export function SetRow({ row, scheme, targetReps, current, onChange }: SetRowPro
             : { borderWidth: 1, borderColor: colors.borderStrong },
         ]}>
         <AppText variant="bodyStrong" color={row.done ? 'onAccent' : 'textSecondary'}>
-          {sideLabel ?? number}
+          {sideLabel ?? climbNumber}
         </AppText>
       </View>
 
-      {scheme === 'circuit' || scheme === 'slots' ? (
+      {scheme === 'circuit' || scheme === 'slots' || climb ? (
         <AppText style={styles.label} color={muted ? 'textSecondary' : 'textPrimary'}>
-          {scheme === 'circuit' ? `Climb ${row.itemIndex}` : `Slot ${row.setIndex}`}
+          {scheme === 'circuit' ? `Climb ${row.itemIndex}` : climb ? `Climb ${climbNumber}` : `Slot ${row.setIndex}`}
         </AppText>
+      ) : null}
+
+      {onPickGrade && (scheme === 'circuit' || scheme === 'slots' || climb) ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={row.grade ? `Grade ${row.grade}` : 'Choose grade'}
+          onPress={onPickGrade}
+          style={({ pressed }) => [
+            styles.grade,
+            { backgroundColor: colors.surfaceSunken },
+            pressed && styles.pressed,
+          ]}>
+          <AppText variant="bodyStrong" color={row.grade ? 'textPrimary' : 'textTertiary'}>
+            {row.grade ?? 'Grade'}
+          </AppText>
+        </Pressable>
       ) : null}
 
       {row.reps != null || scheme === 'reps' || scheme === 'intervals' ? (
@@ -62,7 +86,7 @@ export function SetRow({ row, scheme, targetReps, current, onChange }: SetRowPro
         />
       ) : null}
 
-      {scheme === 'isometric' || scheme === 'free_duration' ? (
+      {scheme === 'isometric' || (scheme === 'free_duration' && !climb) ? (
         <Stepper
           label="duration"
           value={row.durationS}
@@ -70,11 +94,12 @@ export function SetRow({ row, scheme, targetReps, current, onChange }: SetRowPro
           step={durationStep}
           max={scheme === 'free_duration' ? 6 * 3600 : 3600}
           format={formatDuration}
+          inputHint="Seconds, or m:ss"
           onChange={(durationS) => onChange({ durationS })}
         />
       ) : null}
 
-      {scheme === 'reps' || scheme === 'isometric' || scheme === 'intervals' ? (
+      {showLoad && (scheme === 'reps' || scheme === 'isometric' || scheme === 'intervals') ? (
         <Stepper
           label="load"
           value={row.loadKg}
@@ -82,11 +107,12 @@ export function SetRow({ row, scheme, targetReps, current, onChange }: SetRowPro
           min={-100}
           max={200}
           format={formatAddedLoad}
+          inputHint="Added load in kg (negative = assisted)"
           onChange={(loadKg) => onChange({ loadKg })}
         />
       ) : null}
 
-      {scheme !== 'free_duration' ? (
+      {scheme !== 'free_duration' || climb ? (
         <Pressable
           accessibilityRole="switch"
           accessibilityState={{ checked: !failed }}
@@ -124,6 +150,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
   },
   label: { flex: 1 },
+  grade: {
+    minWidth: space[16],
+    height: touch.min,
+    paddingHorizontal: space[3],
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
+  },
   result: { width: touch.min, height: touch.min, alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.5 },
 });

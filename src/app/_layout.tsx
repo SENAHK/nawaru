@@ -15,6 +15,7 @@ import { useEffect } from 'react';
 
 import { EmptyState } from '@/components/empty-state';
 import { Screen } from '@/components/screen';
+import { ToastHost } from '@/components/toast';
 import { DatabaseGate } from '@/db/provider';
 import { getAthlete } from '@/db/queries/profile';
 import { useDbQuery } from '@/db/use-db-version';
@@ -104,9 +105,12 @@ function RootNavigator() {
           <Stack.Screen name="program/[programId]/edit" options={{ title: 'Edit program' }} />
           <Stack.Screen name="program/[programId]/grid" options={{ title: 'Grid view' }} />
           <Stack.Screen name="exercise/[exerciseId]" options={{ title: 'Exercise' }} />
+          {/* The sheet draws its own header: the native one overlaps the content in a page sheet. */}
+          <Stack.Screen name="add-exercise" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         </Stack.Protected>
       </Stack>
+      <ToastHost />
     </ThemeProvider>
   );
 }

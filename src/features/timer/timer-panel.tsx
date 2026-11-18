@@ -28,7 +28,7 @@ import type { Step, TimerState } from './types';
 const REFRESH_MS = 100;
 
 /** Re-renders on a short interval while the timer is running. */
-function useNow(running: boolean): number {
+export function useNow(running: boolean): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!running) return;
@@ -38,7 +38,7 @@ function useNow(running: boolean): number {
   return now;
 }
 
-function phaseLabel(step: Step | null, usesHangboard: boolean): string {
+export function phaseLabel(step: Step | null, usesHangboard: boolean): string {
   switch (step?.phase) {
     case 'prep':
       return 'GET READY';

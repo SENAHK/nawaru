@@ -38,17 +38,20 @@ src/app/
   program/[programId]/edit.tsx       # S9 Program editor
   program/[programId]/grid.tsx       # S9b Grid view
   exercise/[exerciseId].tsx          # S11b Exercise detail
+  add-exercise.tsx                   # S6 Add exercise (modal)
   settings.tsx                       # S13
 ```
 
-Bottom sheets (non routées) : `AddExerciseSheet` (S6), `PrescriptionSheet` (S10), `EnrollSheet`, `ShiftSheet`, `FilterSheet`, `DaySheet`.
+S6 est une route présentée en modal (feuille native iOS) : elle enchaîne deux étapes (recherche, puis dosage) et se remplace par S4 à la fin, ce qui est plus simple avec Expo Router qu'une feuille non routée.
+
+Bottom sheets (non routées, `Sheet` = feuille native `pageSheet`) : `GripSheet` et `GradeSheet` (S5), `PrescriptionSheet` (S10), `EnrollSheet`, `ShiftSheet`, `FilterSheet`, `DaySheet`.
 
 ### 1.3 Règles globales
 
 | Règle | Détail |
 | --- | --- |
-| Séance en cours | Si un workout est commencé et non terminé, une barre persistante s'affiche au-dessus de la TabBar : nom de la séance, durée écoulée, bouton `Resume`. Elle survit à la fermeture de l'app. |
-| Timer actif | Si un timer tourne, la barre affiche la phase et le décompte ; un tap rouvre S4. |
+| Séance en cours | Si un workout est commencé et non terminé, une barre persistante s'affiche au-dessus de la TabBar : nom de la séance, durée écoulée, bouton `Resume`. Elle survit à la fermeture de l'app. C'est le `BottomAccessory` natif de la TabBar (iOS 26+) ; il se réduit dans la TabBar quand on fait défiler. Avant iOS 26, un bouton `Resume` en haut de Today le remplace pour le timer. |
+| Timer actif | Si un timer tourne, la barre affiche la phase et le décompte ; un tap rouvre S4. Un timer terminé mais pas encore enregistré affiche `Tap to save`. |
 | Modifications non enregistrées | Quitter un éditeur ou un log modifié ouvre une confirmation `Discard changes?` (`Discard` / `Keep editing`). |
 | Suppression | Toujours confirmée ; suppression douce (`deleted_at`). |
 | Orientation | Portrait uniquement. |
@@ -113,7 +116,7 @@ Même écran pour une séance prévue (`scheduled_session`) et pour un workout l
 
 **En-tête** : nom du programme et `ProgramDot`, `Week 3 · Day 2`, date prévue, `Badge` de statut. Pour un workout libre : `Free session` et la date.
 
-**Bandeau de date** (si la séance est logué ou en cours) : `Performed on Thu 14 Jan` (modifiable via un sélecteur de date ; défaut = aujourd'hui).
+**Bandeau de date** (si la séance est loguée ou en cours) : `Performed on Thu 14 Jan`, modifiable avec le `DatePicker` natif (`@expo/ui/swift-ui`, dates futures exclues ; défaut = aujourd'hui).
 
 **Liste des exercices** : une `Card` par prescription, dans l'ordre.
 
@@ -139,7 +142,7 @@ En bas de liste : `Add exercise` (S6, ajoute un exercice libre à ce workout).
 | Séance future | Loguable aussi ; confirmation `Log this session early?` |
 | `Finish session` avec des exercices non faits | Confirmation `2 exercises not logged. Finish anyway?` ; les exercices non faits restent `To do` |
 | Séance terminée | Les exercices restent modifiables (réouvrir S5) |
-| Supprimer le workout | Menu `Delete log` : supprime workout, exercise_logs et set_logs ; la séance redevient `planned` ou `missed` |
+| Supprimer le workout | Icône corbeille de l'en-tête (`Delete log`, confirmée) : supprime workout, exercise_logs, set_logs et les références qu'ils ont créées ; la séance redevient `planned` ou `missed` et peut être loguée à nouveau. Un workout libre supprimé ferme l'écran |
 
 ### S4 Exercise (timer + log)
 
@@ -188,7 +191,9 @@ Même écran et même route que S4, sans la zone timer : c'est l'état de S4 qua
 
 **En-tête** : nom de l'exercice, résumé de la prescription (`Prescribed: 7s × 5 × 6 · +5 kg`) ou `Free exercise`.
 
-**Bloc paramètres** (affiché seulement pour les mesures déclarées par l'exercice) : prise (`GripPicker`), bord (`Stepper` mm), support, charge (`Stepper` en unité de l'utilisateur). Modifier un paramètre propose `Apply to all sets`.
+**Bloc paramètres** (affiché seulement pour les mesures déclarées par l'exercice) : prise (`GripPicker`), bord (`Stepper` mm), charge (`Stepper` en unité de l'utilisateur). La charge modifiée ici s'applique aux sets encore à faire ; si des sets sont déjà faits, un bouton `Apply to all sets` l'applique aussi à ceux-là. Le support (`support_label`) est conservé depuis la prescription mais pas encore modifiable.
+
+**Stepper** : un tap sur la valeur ouvre une saisie au clavier (`2:30` accepté pour les durées) ; un appui long sur − ou + répète.
 
 **Bloc sets** : dépend du schéma.
 
@@ -197,19 +202,21 @@ Même écran et même route que S4, sans la zone timer : c'est l'état de S4 qua
 | `reps` | Une `SetRow` par set : reps (Stepper), charge (Stepper), résultat (toggle ✓ / ✗) |
 | `isometric` | Une `SetRow` par set : durée tenue (Stepper s), charge, résultat |
 | `intervals` | Une `SetRow` par set : reps réussies sur la cible (`5/5`, Stepper), charge, résultat |
-| `circuit` | Grille tours × blocs : chaque case = cotation (sélecteur) + ✓ / ✗ |
-| `slots` | Une ligne par créneau : cotation + ✓ / ✗ ; bouton `Add slot` |
-| `free_duration` | Durée totale (Stepper min) ; liste facultative de blocs réussis (cotation), bouton `Add climb`, pas de limite |
+| `circuit` | Grille tours × blocs : chaque case = cotation (sélecteur) + ✓ / ✗ ; bouton `Add round` |
+| `slots` | Une ligne par créneau : cotation + ✓ / ✗ ; boutons `Skip slot` / `Add slot` |
+| `free_duration` | Durée totale (Stepper min) ; liste facultative de blocs réussis (cotation), bouton `Add climb`, pas de limite. Un bloc se retire depuis sa feuille de cotation (`Remove climb`) |
+
+Cotations : `GradeSheet`, grille de pastilles dans le système de bloc de l'athlète (`Font` ou `V-scale`), puisque les exercices d'escalade de la bibliothèque sont des blocs. Un tap sur la cotation choisie l'efface.
 
 - Unilatéral alterné : les lignes vont par paires `L` / `R` pour chaque set.
-- Bouton `Add set` sous la liste (sauf `circuit`).
-- Glisser une ligne vers la gauche : `Delete`.
+- Boutons `Skip set` (retire le dernier set non fait) et `Add set` sous la liste.
+- Pas de suppression par glissement pour l'instant : `Skip set` la remplace.
 
-**Effort** : `EffortPicker` sur l'échelle de la prescription (ou celle par défaut de l'exercice).
+**Effort** : `EffortPicker` sur l'échelle de la prescription (ou celle par défaut de l'exercice) : une rangée de pastilles défilante (RPE 1 à 10 par 0.5, RIR 0 à 5, Feel stocké de 1 = Easy à 5 = Max). Un tap sur la pastille choisie l'efface.
 
 **Notes** : champ texte facultatif.
 
-**Bouton principal** : `Save`. Il enregistre `exercise_log` + `set_log`, ferme le modal et revient à S3.
+**Bouton principal** : `Save`. Il enregistre `exercise_log` (prise, bord, effort, notes) + `set_log`, ferme le modal, revient à S3 et affiche le toast `Exercise logged`. Fermer avec `X` ne demande `Discard changes?` que si quelque chose a changé.
 
 **Test** : si la prescription est un test, l'enregistrement crée une `reference` à partir du meilleur set réussi, puis affiche le toast `New reference: +24 kg · 20 mm · 4F HC`.
 
@@ -223,11 +230,13 @@ Même écran et même route que S4, sans la zone timer : c'est l'état de S4 qua
 | Bord | 4 à 60 mm |
 | Effort | Dans la plage de l'échelle |
 
-### S6 Add exercise (bottom sheet)
+### S6 Add exercise (modal)
 
-1. Recherche dans la bibliothèque (même liste et mêmes filtres que S11, en mode sélection).
-2. Après sélection : formulaire de dosage rapide (identique à S10, sans les options de test ni de progression), pré-rempli avec la dernière réalisation de cet exercice, sinon avec des valeurs par défaut par schéma (§3.3).
-3. `Add` : crée un `exercise_log` sans prescription dans le workout ciblé, puis ouvre S4 et lance le timer.
+Ouvert depuis Today (workout libre du jour), depuis S3 (`Add exercise` en bas de liste : ce workout, créé si besoin) ou depuis S11b (`Add to today`, qui passe directement à l'étape 2).
+
+1. Recherche dans la bibliothèque (nom, insensible aux accents et à la casse). Les filtres de S11 viendront avec l'étape Library.
+2. Après sélection : formulaire de dosage rapide (identique à S10, sans les options de test ni de progression), pré-rempli avec la dernière réalisation de cet exercice (dosage et meilleure charge réussie), sinon avec des valeurs par défaut par schéma (§3.3). La ligne d'aide indique `Pre-filled from your last time` ou `Default values`. Bouton `Change exercise` pour revenir à la liste.
+3. `Add and start` : crée un `exercise_log` sans prescription dans le workout ciblé, puis ouvre S4 et lance le timer.
 
 ### S7 Programs
 

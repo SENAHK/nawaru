@@ -8,10 +8,12 @@ import {
   clearActiveTimer,
   loadLogSession,
   readActiveTimer,
-  saveLogRows,
+  saveLog,
   setTimerSoundsEnabled,
   writeActiveTimer,
+  type LogDetails,
   type LogSessionData,
+  type SavedReference,
 } from '@/db/queries/log';
 
 import { loadSounds, playCue, unloadSounds } from './audio';
@@ -20,9 +22,11 @@ import { computeCues } from './cues';
 import * as machine from './machine';
 import { back, completeManual, pause, resume, skip, stop } from './machine';
 import {
+  addClimbRow,
   addSetRows,
   applyTimerResults,
   buildPlannedRows,
+  removeClimbRow,
   removeLastSetRows,
   type LogRow,
 } from './rows';
@@ -34,6 +38,8 @@ const DONE_SOUND_GRACE_MS = 1500;
 export type Session = Omit<LogSessionData, 'savedSets'> & {
   rows: LogRow[];
   timer: TimerState | null;
+  /** True once anything differs from what is saved. */
+  dirty: boolean;
 };
 
 let session: Session | null = null;
@@ -71,6 +77,7 @@ function rowsFromSaved(data: LogSessionData): LogRow[] {
     reps: set.repsDone,
     durationS: set.durationS,
     loadKg: set.loadKg,
+    grade: set.grade,
     result: set.result,
     done: true,
     edited: true,
@@ -83,7 +90,7 @@ export function openSession(exerciseLogId: string): Session | null {
   const data = loadLogSession(exerciseLogId);
   if (!data) return null;
   const { savedSets: _savedSets, ...rest } = data;
-  session = { ...rest, rows: rowsFromSaved(data), timer: null };
+  session = { ...rest, rows: rowsFromSaved(data), timer: null, dirty: false };
   emit();
   return session;
 }
@@ -95,6 +102,11 @@ export function restoreSession(): void {
   try {
     session = JSON.parse(stored.stateJson) as Session;
   } catch {
+    session = null;
+  }
+  // A timer saved by an older version of the app lacks the log details.
+  if (!session?.details) {
+    session = null;
     clearActiveTimer();
     return;
   }
@@ -166,6 +178,7 @@ function commitTimer(
     ...session,
     timer: next,
     rows: applyTimerResults(session.rows, session.dosage, next.results, next.status === 'stopped'),
+    dirty: true,
   };
   persist();
   emit();
@@ -203,12 +216,56 @@ export function dispatch(action: TimerAction): void {
   commitTimer(next, { prevNow: now, now });
 }
 
-export function editRow(key: string, values: Partial<Pick<LogRow, 'reps' | 'durationS' | 'loadKg' | 'result'>>): void {
+export type RowValues = Partial<Pick<LogRow, 'reps' | 'durationS' | 'loadKg' | 'grade' | 'result'>>;
+
+export function editRow(key: string, values: RowValues): void {
   if (!session) return;
   session = {
     ...session,
     rows: session.rows.map((row) => (row.key === key ? { ...row, ...values, edited: true } : row)),
+    dirty: true,
   };
+  persist();
+  emit();
+}
+
+/** Grip, edge, effort and notes of the whole exercise. */
+export function editDetails(values: Partial<LogDetails>): void {
+  if (!session) return;
+  session = { ...session, details: { ...session.details, ...values }, dirty: true };
+  persist();
+  emit();
+}
+
+/**
+ * Load set from the parameters block: applies to the sets still to do, or to
+ * every set with `all` ("Apply to all sets").
+ */
+export function setLoadForSets(loadKg: number, all: boolean): void {
+  if (!session) return;
+  session = {
+    ...session,
+    targetLoadKg: loadKg,
+    rows: session.rows.map((row) => (all || !row.done ? { ...row, loadKg } : row)),
+    dirty: true,
+  };
+  persist();
+  emit();
+}
+
+/** Free duration: logs one more climb. */
+export function addClimb(): string | null {
+  if (!session) return null;
+  const rows = addClimbRow(session.rows);
+  session = { ...session, rows, dirty: true };
+  persist();
+  emit();
+  return rows.at(-1)?.key ?? null;
+}
+
+export function removeClimb(key: string): void {
+  if (!session) return;
+  session = { ...session, rows: removeClimbRow(session.rows, key), dirty: true };
   persist();
   emit();
 }
@@ -216,7 +273,7 @@ export function editRow(key: string, values: Partial<Pick<LogRow, 'reps' | 'dura
 function changeSetCount(rows: LogRow[], dosage: TimerDosage) {
   if (!session) return;
   const timer = session.timer;
-  session = { ...session, rows, dosage };
+  session = { ...session, rows, dosage, dirty: true };
   if (timer && isActive(timer)) {
     const now = Date.now();
     commitTimer(machine.replaceSteps(timer, buildSteps(dosage, session.settings), now), {
@@ -254,12 +311,14 @@ export function toggleSounds(): void {
   emit();
 }
 
-/** Writes the rows to the database and closes the session. */
-export function saveSession(): void {
-  if (!session) return;
+/** Writes the log to the database and closes the session. Returns the reference a test produced. */
+export function saveSession(): SavedReference | null {
+  if (!session) return null;
   if (isActive(session.timer)) dispatch('stop');
-  saveLogRows(session.exerciseLogId, session.rows);
+  const { exerciseLogId, rows, details, gradeSystem } = session;
+  const created = saveLog(exerciseLogId, rows, details, gradeSystem);
   closeSession();
+  return created;
 }
 
 /** Drops the session without saving (the exercise log itself stays). */

@@ -9,14 +9,23 @@ import { AppText } from '@/components/app-text';
 import { Button } from '@/components/button';
 import { EmptyState } from '@/components/empty-state';
 import { IconButton } from '@/components/icon-button';
+import { TextField } from '@/components/text-field';
+import { showToast } from '@/components/toast';
+import type { SavedReference } from '@/db/queries/log';
+import { EffortPicker } from '@/features/log/effort-picker';
+import { GradeSheet } from '@/features/log/grade-sheet';
+import { LogParams } from '@/features/log/log-params';
 import { setCount } from '@/features/timer/build-steps';
 import { currentRowKey, type LogRow } from '@/features/timer/rows';
 import { SetRow } from '@/features/timer/set-row';
 import {
+  addClimb,
   addSet,
   closeSession,
+  editDetails,
   editRow,
   openSession,
+  removeClimb,
   saveSession,
   skipLastSet,
   startTimer,
@@ -24,10 +33,21 @@ import {
 } from '@/features/timer/store';
 import { TimerPanel } from '@/features/timer/timer-panel';
 import { dosageSummary } from '@/lib/dosage-summary';
+import { formatAddedLoad, formatGrip } from '@/lib/format';
 import { space, useTheme } from '@/theme';
 
+function referenceToast(reference: SavedReference): string {
+  return [
+    `New reference: ${formatAddedLoad(reference.valueKg)}`,
+    reference.edgeMm != null ? `${reference.edgeMm} mm` : null,
+    formatGrip(reference) || null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 // S4 Exercise (timer + log) and S5 Log: same screen, with or without a timer
-// (docs/screens.md). Grip, effort and notes come with the full log step.
+// (docs/screens.md).
 export default function ExerciseLogScreen() {
   useKeepAwake();
   const { exerciseLogId, autostart } = useLocalSearchParams<{
@@ -37,6 +57,7 @@ export default function ExerciseLogScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [focus, setFocus] = useState(false);
+  const [gradeKey, setGradeKey] = useState<string | null>(null);
   const stored = useSession();
   const session = stored?.exerciseLogId === exerciseLogId ? stored : null;
 
@@ -53,14 +74,17 @@ export default function ExerciseLogScreen() {
     );
   }
 
-  const { timer, rows, dosage } = session;
+  const { timer, rows, dosage, details, measures } = session;
   const timerActive = timer?.status === 'running' || timer?.status === 'paused';
   const currentKey = timerActive ? currentRowKey(rows) : null;
-  const canChangeSets = dosage.scheme !== 'free_duration';
+  const freeDuration = dosage.scheme === 'free_duration';
+  const recordsGrade = measures.includes('grade');
+  const gradeRow = rows.find((row) => row.key === gradeKey) ?? null;
 
   const save = () => {
-    saveSession();
+    const reference = saveSession();
     router.back();
+    showToast(reference ? referenceToast(reference) : 'Exercise logged');
   };
 
   const confirmStop = () =>
@@ -69,18 +93,19 @@ export default function ExerciseLogScreen() {
       { text: 'Stop and save', style: 'destructive', onPress: save },
     ]);
 
-  const discard = () =>
+  const close = () => {
+    const leave = () => {
+      closeSession();
+      router.back();
+    };
+    if (!session.dirty) return leave();
     Alert.alert('Discard changes?', undefined, [
       { text: 'Keep editing', style: 'cancel' },
-      {
-        text: 'Discard',
-        style: 'destructive',
-        onPress: () => {
-          closeSession();
-          router.back();
-        },
-      },
+      { text: 'Discard', style: 'destructive', onPress: leave },
     ]);
+  };
+
+  const pickGrade = (key: string) => setGradeKey(key);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.bg }]}>
@@ -90,26 +115,31 @@ export default function ExerciseLogScreen() {
           timer={timer}
           focus={focus}
           onToggleFocus={() => setFocus((value) => !value)}
-          // Closing leaves the timer running; it can be reopened from Today.
+          // Closing leaves the timer running; the session bar brings it back.
           onClose={() => router.back()}
         />
       ) : (
         <View style={[styles.plainHeader, { paddingTop: insets.top }]}>
-          <IconButton icon={X} label="Close" onPress={discard} />
+          <IconButton icon={X} label="Close" onPress={close} />
         </View>
       )}
 
       {focus && timer ? null : (
         <>
-          <ScrollView contentContainerStyle={styles.content}>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            automaticallyAdjustKeyboardInsets
+            keyboardShouldPersistTaps="handled">
             <View style={styles.heading}>
               <AppText variant="title2" accessibilityRole="header">
                 {session.exerciseName}
               </AppText>
               <AppText variant="bodySm" color="textSecondary">
-                {dosageSummary(dosage)}
+                {session.prescribed ?? `Free exercise · ${dosageSummary(dosage)}`}
               </AppText>
             </View>
+
+            <LogParams session={session} />
 
             {groupBySet(rows).map(([setIndex, setRows]) => (
               <View key={setIndex} style={styles.set}>
@@ -125,24 +155,59 @@ export default function ExerciseLogScreen() {
                     scheme={dosage.scheme}
                     targetReps={dosage.reps ?? null}
                     current={row.key === currentKey}
+                    showLoad={measures.includes('load')}
+                    onPickGrade={recordsGrade || freeDuration ? () => pickGrade(row.key) : undefined}
                     onChange={(values) => editRow(row.key, values)}
                   />
                 ))}
               </View>
             ))}
 
-            {canChangeSets ? (
+            {freeDuration ? (
+              <Button
+                title="Add climb"
+                variant="ghost"
+                onPress={() => {
+                  const key = addClimb();
+                  if (key) pickGrade(key);
+                }}
+              />
+            ) : (
               <View style={styles.setActions}>
                 <Button
-                  title="Skip set"
+                  title={dosage.scheme === 'slots' ? 'Skip slot' : 'Skip set'}
                   variant="ghost"
                   disabled={setCount(dosage) <= 1}
                   onPress={() => skipLastSet()}
                   style={styles.setAction}
                 />
-                <Button title="Add set" variant="ghost" onPress={addSet} style={styles.setAction} />
+                <Button
+                  title={dosage.scheme === 'slots' ? 'Add slot' : dosage.scheme === 'circuit' ? 'Add round' : 'Add set'}
+                  variant="ghost"
+                  onPress={addSet}
+                  style={styles.setAction}
+                />
               </View>
-            ) : null}
+            )}
+
+            <EffortPicker
+              scale={details.effortScale}
+              value={details.effortValue}
+              onChange={(effortValue) => editDetails({ effortValue })}
+            />
+
+            <View style={styles.notes}>
+              <AppText variant="label" color="textSecondary">
+                Notes
+              </AppText>
+              <TextField
+                value={details.notes}
+                onChangeText={(notes) => editDetails({ notes })}
+                placeholder="How did it go?"
+                multiline
+                style={styles.notesField}
+              />
+            </View>
           </ScrollView>
 
           <View style={[styles.footer, { paddingBottom: insets.bottom + space[3], borderTopColor: colors.border }]}>
@@ -158,6 +223,17 @@ export default function ExerciseLogScreen() {
           </View>
         </>
       )}
+
+      <GradeSheet
+        visible={gradeRow != null}
+        system={session.gradeSystem}
+        value={gradeRow?.grade ?? null}
+        onChange={(grade) => gradeRow && editRow(gradeRow.key, { grade })}
+        onRemove={
+          freeDuration && gradeRow && gradeRow.setIndex > 1 ? () => removeClimb(gradeRow.key) : undefined
+        }
+        onClose={() => setGradeKey(null)}
+      />
     </View>
   );
 }
@@ -178,6 +254,8 @@ const styles = StyleSheet.create({
   set: { gap: space[2] },
   setActions: { flexDirection: 'row', gap: space[3] },
   setAction: { flex: 1 },
+  notes: { gap: space[2], paddingTop: space[2] },
+  notesField: { minHeight: space[16] + space[8], paddingTop: space[3], textAlignVertical: 'top' },
   footer: {
     flexDirection: 'row',
     gap: space[3],
