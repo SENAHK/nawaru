@@ -1,45 +1,71 @@
 import { addDatabaseChangeListener } from 'expo-sqlite';
-import { useState, useSyncExternalStore } from 'react';
+import { useRef, useSyncExternalStore } from 'react';
 
-// A counter bumped (at most once per frame) whenever any table changes.
-// Screens that read with synchronous queries depend on it to refresh.
-let version = 0;
-let scheduled = false;
-const listeners = new Set<() => void>();
+// A counter bumped (at most once per frame) whenever any table changes, and
+// after every navigation. Screens that read with synchronous queries depend on
+// it to refresh (see useDbQuery).
 
-addDatabaseChangeListener(() => {
-  if (scheduled) return;
-  scheduled = true;
+type Store = {
+  version: number;
+  scheduled: boolean;
+  listeners: Set<() => void>;
+};
+
+// Kept on globalThis so a Fast Refresh of this module reuses the same counter
+// and database listener instead of starting a second, disconnected copy.
+const globalStore = globalThis as { __nawaruDbVersion?: Store };
+const store: Store = (globalStore.__nawaruDbVersion ??= (() => {
+  const created: Store = { version: 0, scheduled: false, listeners: new Set() };
+  addDatabaseChangeListener(() => scheduleBump(created));
+  return created;
+})());
+
+function scheduleBump(target: Store) {
+  if (target.scheduled) return;
+  target.scheduled = true;
   setTimeout(() => {
-    scheduled = false;
-    version += 1;
-    for (const listener of listeners) listener();
+    target.scheduled = false;
+    target.version += 1;
+    for (const listener of target.listeners) listener();
   }, 16);
-});
+}
+
+/**
+ * Makes every mounted query read again. Called after each navigation, so a
+ * screen coming back into view never shows rows from before a change made on
+ * another screen.
+ */
+export function refreshDbQueries(): void {
+  scheduleBump(store);
+}
 
 function subscribe(listener: () => void) {
-  listeners.add(listener);
+  store.listeners.add(listener);
   return () => {
-    listeners.delete(listener);
+    store.listeners.delete(listener);
   };
 }
 
 export function useDbVersion(): number {
-  return useSyncExternalStore(subscribe, () => version);
+  return useSyncExternalStore(subscribe, () => store.version);
 }
 
 /**
  * Runs a synchronous database read and re-runs it when `key` changes or when
  * the database changes. `key` must identify everything the read depends on.
+ *
+ * The result is a `useSyncExternalStore` snapshot cached per database version:
+ * React re-checks it on every render and every change, so a render that is
+ * interrupted (navigation, concurrent updates) cannot leave stale rows behind.
  */
 export function useDbQuery<T>(read: () => T, key: string): T {
-  const dbVersion = useDbVersion();
-  const [cache, setCache] = useState(() => ({ key, dbVersion, value: read() }));
-  if (cache.key !== key || cache.dbVersion !== dbVersion) {
-    // Derived state: refresh during render so the screen never shows stale rows.
-    const next = { key, dbVersion, value: read() };
-    setCache(next);
-    return next.value;
-  }
-  return cache.value;
+  const cache = useRef<{ version: number; key: string; value: T } | null>(null);
+  const getSnapshot = () => {
+    const current = cache.current;
+    if (current && current.version === store.version && current.key === key) return current.value;
+    const value = read();
+    cache.current = { version: store.version, key, value };
+    return value;
+  };
+  return useSyncExternalStore(subscribe, getSnapshot);
 }

@@ -32,6 +32,7 @@ import {
   shiftEnrollment,
   stopEnrollment,
 } from '../../src/db/queries/enrollment';
+import { getLibrary, isFavorite, toggleFavorite } from '../../src/db/queries/library';
 import { seedDatabase } from '../../src/db/seed';
 import { addClimbRow, buildPlannedRows, removeClimbRow } from '../../src/features/timer/rows';
 import { addDays, mondayOf, today } from '../../src/lib/dates';
@@ -280,5 +281,25 @@ describe('enrollments', () => {
     const again = getProgramsOverview();
     assert.deepEqual([again.active.length, again.archived.length, again.active[0].startDate], [1, 0, next]);
     assert.throws(() => enrollInProgram(programId, addDays(next, 1), '#fff'), /not a Monday/);
+  });
+});
+
+describe('library', () => {
+  it('lists the seeded exercises with muscles and equipment', () => {
+    const library = getLibrary();
+    assert.equal(library.length, 25);
+    const hangs = library.find((item) => item.name === 'Max hangs')!;
+    assert.ok(hangs.equipment.some((gear) => gear.name === 'Hangboard'));
+    assert.ok(hangs.muscles.some((muscle) => muscle.role === 'primary'));
+  });
+
+  it('stars and unstars an exercise without duplicating rows', () => {
+    const [first] = getLibrary();
+    assert.equal(toggleFavorite(first.id), true);
+    assert.equal(toggleFavorite(first.id), false);
+    assert.equal(toggleFavorite(first.id), true);
+    assert.equal(isFavorite(first.id), true);
+    assert.equal(getLibrary().filter((item) => item.favorite).length, 1);
+    assert.equal(db.select().from(schema.exerciseFavorite).all().length, 1);
   });
 });

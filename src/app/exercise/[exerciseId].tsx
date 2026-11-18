@@ -1,8 +1,8 @@
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { Clapperboard } from 'lucide-react-native';
+import { Clapperboard, Star } from 'lucide-react-native';
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { Badge } from '@/components/badge';
@@ -18,6 +18,8 @@ import {
   exerciseMusclesQuery,
   exerciseReferencesQuery,
 } from '@/db/queries/exercise';
+import { isFavorite, toggleFavorite } from '@/db/queries/library';
+import { useDbQuery } from '@/db/use-db-version';
 import { formatAddedLoad, formatDate, formatGrip } from '@/lib/format';
 import {
   categoryLabels,
@@ -45,6 +47,8 @@ export default function ExerciseDetailScreen() {
   ]);
   const { data: references } = useLiveQuery(exerciseReferencesQuery(exerciseId), [exerciseId]);
 
+  const favorite = useDbQuery(() => isFavorite(exerciseId), `favorite:${exerciseId}`);
+
   const exercise = exercises[0];
   // `updatedAt` is unset until the first query result arrives.
   if (!updatedAt) return null;
@@ -63,7 +67,26 @@ export default function ExerciseDetailScreen() {
       contentInsetAdjustmentBehavior="automatic"
       style={{ backgroundColor: colors.bg }}
       contentContainerStyle={styles.content}>
-      <Stack.Screen options={{ title: exercise.name }} />
+      <Stack.Screen
+        options={{
+          title: exercise.name,
+          headerRight: () => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={favorite ? 'Remove from favorites' : 'Add to favorites'}
+              hitSlop={space[2]}
+              onPress={() => toggleFavorite(exercise.id)}
+              style={({ pressed }) => [styles.star, pressed && styles.pressed]}>
+              <Star
+                size={22}
+                strokeWidth={1.75}
+                color={favorite ? colors.accent : colors.textSecondary}
+                fill={favorite ? colors.accent : 'transparent'}
+              />
+            </Pressable>
+          ),
+        }}
+      />
 
       {/* Media placeholder: videos and diagrams are not defined yet. */}
       <View style={[styles.media, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -220,6 +243,8 @@ function ChipRow({ labels, emphasis }: { labels: string[]; emphasis?: boolean })
 }
 
 const styles = StyleSheet.create({
+  star: { padding: space[1] },
+  pressed: { opacity: 0.6 },
   content: { padding: space[4], paddingBottom: space[12], gap: space[6] },
   media: {
     aspectRatio: 16 / 9,

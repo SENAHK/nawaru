@@ -8,7 +8,7 @@ import {
   BarlowCondensed_700Bold,
 } from '@expo-google-fonts/barlow-condensed';
 import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -18,7 +18,7 @@ import { Screen } from '@/components/screen';
 import { ToastHost } from '@/components/toast';
 import { DatabaseGate } from '@/db/provider';
 import { getAthlete } from '@/db/queries/profile';
-import { useDbQuery } from '@/db/use-db-version';
+import { refreshDbQueries, useDbQuery } from '@/db/use-db-version';
 import { restoreSession } from '@/features/timer/store';
 import { AppThemeProvider, typography, useTheme } from '@/theme';
 
@@ -63,6 +63,10 @@ function RootNavigator() {
   useHideSplash();
   // Brings back a timer that was running when the app was closed.
   useEffect(() => restoreSession(), []);
+  // Screens read the database synchronously: re-read after each navigation so
+  // the screen coming into view reflects changes made elsewhere.
+  const pathname = usePathname();
+  useEffect(() => refreshDbQueries(), [pathname]);
   const { colors, scheme } = useTheme();
   // Until the athlete profile exists, onboarding is the only reachable screen.
   const onboarded = useDbQuery(() => getAthlete() != null, 'athlete');

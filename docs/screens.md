@@ -235,9 +235,9 @@ Cotations : `GradeSheet`, grille de pastilles dans le système de bloc de l'athl
 
 Ouvert depuis Today (workout libre du jour), depuis S3 (`Add exercise` en bas de liste : ce workout, créé si besoin) ou depuis S11b (`Add to today`, qui passe directement à l'étape 2).
 
-1. Recherche dans la bibliothèque (nom, insensible aux accents et à la casse). Les filtres de S11 viendront avec l'étape Library.
+1. Recherche dans la bibliothèque : la liste de S11 en mode sélection, avec recherche, filtres, groupement et favoris.
 2. Après sélection : formulaire de dosage rapide (identique à S10, sans les options de test ni de progression), pré-rempli avec la dernière réalisation de cet exercice (dosage et meilleure charge réussie), sinon avec des valeurs par défaut par schéma (§3.3). La ligne d'aide indique `Pre-filled from your last time` ou `Default values`. Bouton `Change exercise` pour revenir à la liste.
-3. `Add and start` : crée un `exercise_log` sans prescription dans le workout ciblé, puis ouvre S4 et lance le timer.
+3. Deux boutons : `Add` crée un `exercise_log` sans prescription dans le workout ciblé, ferme la feuille et affiche le toast `Pull-ups added` ; `Add and start` le crée puis ouvre S4 et lance le timer.
 
 ### S7 Programs
 
@@ -326,18 +326,20 @@ Un aperçu `DosageSummary` est affiché en haut et mis à jour en direct. Le bou
 ### S11 Library
 
 - **Barre de recherche** (nom, insensible aux accents et à la casse).
-- **Filtres** : bouton `Filters` (badge du nombre de filtres actifs) qui ouvre `FilterSheet` : catégorie, muscles, équipement, schéma, favoris. Filtres cumulables (ET entre groupes, OU à l'intérieur d'un groupe).
-- **Groupement** : SegmentedControl `Category` / `Muscle` / `A–Z`.
-- **Ligne** : pastille catégorie, nom, schéma et équipement en `bodySm`, étoile favori à droite.
-- **Mode sélection** (depuis S6 / S9) : un tap sélectionne l'exercice au lieu d'ouvrir le détail.
+- **Filtres** : bouton à icône à droite de la recherche (badge du nombre de valeurs actives) qui ouvre `FilterSheet` : favoris, catégorie, schéma (`Structure`), muscles, équipement ; seuls les muscles et équipements utilisés par la bibliothèque sont proposés. Filtres cumulables (ET entre groupes, OU à l'intérieur d'un groupe). Bouton `Clear` dans la feuille.
+- **Groupement** : SegmentedControl `Category` / `Muscle` / `A–Z`. Par muscle, un exercice apparaît sous chacun de ses muscles principaux (`Other` s'il n'en a pas).
+- **Ligne** : pastille catégorie, nom, schéma et équipement en `bodySm`, étoile favori à droite (un tap l'active ou la retire, sans ouvrir le détail).
+- **Mode sélection** (depuis S6 / S9) : même liste (composant `LibraryList`), un tap sélectionne l'exercice au lieu d'ouvrir le détail.
+- Changer la recherche, les filtres ou le groupement remonte la liste en haut, pour que les premiers résultats restent visibles.
+- Recherche, filtres et groupement ne sont pas mémorisés d'une ouverture à l'autre.
 
-**État vide** (aucun résultat) : `No exercises match` + bouton `Clear filters`.
+**État vide** (aucun résultat) : `No exercises match` + bouton `Clear filters` (vide aussi la recherche).
 
-> Favoris : ajout d'une table `exercise_favorite (user_id, exercise_id)` au modèle de données.
+> Favoris : table `exercise_favorite (user_id, exercise_id)` du modèle de données.
 
 ### S11b Exercise detail
 
-Média (emplacement réservé, ratio 16:9), nom, catégorie, schéma, description, instructions, muscles (principaux puis secondaires), équipement.
+Média (emplacement réservé, ratio 16:9), nom, catégorie, schéma, description, instructions, muscles (principaux puis secondaires), équipement. Étoile favori dans l'en-tête, bouton `Add to today` (ouvre S6 à l'étape du dosage).
 
 Sections dynamiques :
 - **History** : les 5 dernières réalisations (date, résumé, charge), et `See all` qui ouvre l'historique dans S12.

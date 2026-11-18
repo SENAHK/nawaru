@@ -1,17 +1,12 @@
-import { asc } from 'drizzle-orm';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronRight, Search } from 'lucide-react-native';
 import { useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/app-text';
 import { Button } from '@/components/button';
-import { EmptyState } from '@/components/empty-state';
-import { ListItem } from '@/components/list-item';
 import { Stepper } from '@/components/stepper';
-import { TextField } from '@/components/text-field';
-import { db, schema } from '@/db/client';
+import { showToast } from '@/components/toast';
 import type { DosageScheme } from '@/db/enums';
 import {
   addFreeExercise,
@@ -20,10 +15,10 @@ import {
   type AddTarget,
   type DosageValues,
 } from '@/db/queries/log';
-import { useDbQuery } from '@/db/use-db-version';
+import { LibraryList } from '@/features/library/library-list';
 import { formatAddedLoad, formatDuration } from '@/lib/format';
-import { categoryLabels, schemeLabels } from '@/lib/labels';
-import { categoryColors, space, useTheme } from '@/theme';
+import { schemeLabels } from '@/lib/labels';
+import { space, useTheme } from '@/theme';
 
 type Field = {
   key: keyof DosageValues;
@@ -62,10 +57,6 @@ const fields: Record<DosageScheme, Field[]> = {
 
 const LOAD_SCHEMES = new Set<DosageScheme>(['reps', 'isometric', 'intervals']);
 
-/** Case- and accent-insensitive search key. */
-const searchKey = (text: string) =>
-  text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-
 // S6 Add exercise: pick from the library, set a quick dosage, then start the
 // timer. Adds to the given workout or session, else to today's free session.
 export default function AddExerciseScreen() {
@@ -76,13 +67,8 @@ export default function AddExerciseScreen() {
   }>();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const [query, setQuery] = useState('');
   const [draft, setDraft] = useState<AddExerciseDraft | null>(() =>
     params.exerciseId ? getAddExerciseDraft(params.exerciseId) : null,
-  );
-  const exercises = useDbQuery(
-    () => db.select().from(schema.exercise).orderBy(asc(schema.exercise.name)).all(),
-    'exercises',
   );
 
   const target: AddTarget = params.workoutId
@@ -92,40 +78,15 @@ export default function AddExerciseScreen() {
       : null;
 
   if (!draft) {
-    const key = searchKey(query);
-    const matches = key ? exercises.filter((item) => searchKey(item.name).includes(key)) : exercises;
     return (
       <View style={[styles.root, { backgroundColor: colors.bg }]}>
         <SheetHeader title="Add exercise" action="Cancel" onAction={() => router.back()} />
-        <View style={styles.search}>
-          <Search size={20} strokeWidth={1.75} color={colors.textTertiary} style={styles.searchIcon} />
-          <TextField
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search exercises"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-            returnKeyType="search"
-            style={styles.searchField}
+        <View style={styles.picker}>
+          <LibraryList
+            bottomInset={insets.bottom}
+            onPress={(exercise) => setDraft(getAddExerciseDraft(exercise.id))}
           />
         </View>
-        <FlatList
-          data={matches}
-          keyExtractor={(item) => item.id}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + space[4] }]}
-          ListEmptyComponent={<EmptyState title="No exercises match" />}
-          renderItem={({ item }) => (
-            <ListItem
-              title={item.name}
-              subtitle={`${categoryLabels[item.category]} · ${schemeLabels[item.dosageScheme]}`}
-              dotColor={categoryColors[item.category]}
-              right={<ChevronRight size={20} strokeWidth={1.75} color={colors.textTertiary} />}
-              onPress={() => setDraft(getAddExerciseDraft(item.id))}
-            />
-          )}
-        />
       </View>
     );
   }
@@ -134,13 +95,19 @@ export default function AddExerciseScreen() {
     setDraft({ ...draft, dosage: { ...draft.dosage, [key]: value } });
   const showLoad = draft.measures.includes('load') && LOAD_SCHEMES.has(draft.scheme);
 
-  const add = () => {
+  /** Adds the exercise; with `start`, opens it and starts the timer. */
+  const add = (start: boolean) => {
     const exerciseLogId = addFreeExercise(target, {
       exerciseId: draft.exerciseId,
       dosage: draft.dosage,
       targetLoadKg: showLoad ? draft.targetLoadKg : null,
     });
-    router.replace({ pathname: '/log/[exerciseLogId]', params: { exerciseLogId, autostart: '1' } });
+    if (start) {
+      router.replace({ pathname: '/log/[exerciseLogId]', params: { exerciseLogId, autostart: '1' } });
+    } else {
+      router.back();
+      showToast(`${draft.name} added`);
+    }
   };
 
   return (
@@ -200,7 +167,8 @@ export default function AddExerciseScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + space[3], borderTopColor: colors.border }]}>
-        <Button title="Add and start" size="lg" onPress={add} />
+        <Button title="Add" variant="secondary" size="lg" onPress={() => add(false)} style={styles.footerButton} />
+        <Button title="Add and start" size="lg" onPress={() => add(true)} style={styles.footerButton} />
       </View>
     </View>
   );
@@ -231,15 +199,15 @@ const styles = StyleSheet.create({
   },
   headerSide: { width: space[16] + space[8], alignItems: 'flex-start' },
   headerTitle: { flex: 1, textAlign: 'center' },
-  search: { justifyContent: 'center', paddingHorizontal: space[4], paddingTop: space[3] },
-  searchIcon: { position: 'absolute', left: space[4] + space[3], top: space[3] + 14, zIndex: 1 },
-  searchField: { paddingLeft: space[10] },
-  list: { paddingHorizontal: space[4], paddingTop: space[2] },
+  picker: { flex: 1, paddingHorizontal: space[4], paddingTop: space[3] },
   form: { padding: space[4], gap: space[3] },
   line: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
   name: { width: space[16] + space[4] },
   stepper: { flex: 1, flexDirection: 'row' },
+  footerButton: { flex: 1 },
   footer: {
+    flexDirection: 'row',
+    gap: space[3],
     paddingTop: space[3],
     paddingHorizontal: space[4],
     borderTopWidth: StyleSheet.hairlineWidth,

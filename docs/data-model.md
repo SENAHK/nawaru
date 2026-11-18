@@ -80,7 +80,7 @@ Trois blocs : **catalogue** (exercices, lecture seule en V1), **plan** (programm
 | `exercise_equipment` | `exercise_id`, `equipment_id` | |
 | `exercise_measure` | `exercise_id`, `measure` | `load`, `grip`, `edge`, `grade`, `tempo`, `range`, `effort`, `result` : champs proposés à la prescription et au log |
 | `exercise_media` | `exercise_id`, `kind` (`video` / `image`), `uri`, `sort` | Contenu à définir |
-| `exercise_favorite` | `user_id`, `exercise_id` (unique ensemble) | Favoris de la bibliothèque |
+| `exercise_favorite` | `user_id`, `exercise_id` (unique ensemble) | Favoris de la bibliothèque. Retirer un favori remplit `deleted_at` ; le remettre réutilise la même ligne |
 
 ## 4. Utilisateurs
 
@@ -300,7 +300,7 @@ Une validation côté code (schéma Zod par `dosage_scheme`) garantit que les co
 | Validation des dosages (Zod) | `src/db/dosage.ts` |
 | Seed | `src/db/seed/` : `catalog.ts` (muscles, équipement, exercices), `demo-program.ts` (coach factice et programme de démo) |
 | Contrôle du seed | `npm run check:seed` applique les migrations et le seed à une base SQLite en mémoire, clés étrangères et contraintes `CHECK` actives |
-| Requêtes | `src/db/queries/` ; les écrans les lisent avec `useDbQuery`, qui relance la lecture à chaque changement de la base |
+| Requêtes | `src/db/queries/` ; les écrans les lisent avec `useDbQuery` (instantané `useSyncExternalStore` mis en cache par version), relu à chaque changement de la base et à chaque navigation |
 | Tests | `npm test` : logique pure (timer, calendrier, charges) et un parcours complet en base (onboarding, séance de test, référence, charges en %, logs libres, inscriptions : décalage, pause, reprise, arrêt), sur une base SQLite en mémoire |
 
 Le seed est chargé au premier lancement, quand la table `exercise` est vide. À l'onboarding, les programmes du coach factice sont rattachés à l'athlète et inscrits avec, pour date de début, le lundi de la semaine en cours.
