@@ -12,13 +12,20 @@ type SheetProps = {
   children: ReactNode;
   /** Extra actions shown left of "Done". */
   footer?: ReactNode;
+  /** Called once the sheet is fully closed (navigate from here, not before). */
+  onDismiss?: () => void;
 };
 
 /** Native iOS page sheet, dismissed by swiping down or "Done" (design-system BottomSheet). */
-export function Sheet({ visible, title, onClose, children, footer }: SheetProps) {
+export function Sheet({ visible, title, onClose, children, footer, onDismiss }: SheetProps) {
   const { colors } = useTheme();
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+      onDismiss={onDismiss}>
       <View style={[styles.root, { backgroundColor: colors.bg }]}>
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <AppText variant="title3" accessibilityRole="header" style={styles.title}>

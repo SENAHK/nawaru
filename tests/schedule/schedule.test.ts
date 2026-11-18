@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  enrollMondays,
   programWeekOf,
+  weeksPaused,
   resolveLoad,
   scheduledDate,
   sessionStatus,
@@ -69,5 +71,19 @@ describe('resolveLoad', () => {
   it('falls back to the last logged load when nothing is prescribed', () => {
     assert.deepEqual(resolveLoad('none', null, null, 5), { kg: 5, label: '+5 kg · last' });
     assert.deepEqual(resolveLoad('none', null, null, null), { kg: null, label: '' });
+  });
+});
+
+describe('enrollment dates', () => {
+  it('offers this Monday and the next ones, defaulting to the coming Monday', () => {
+    const { mondays, defaultMonday } = enrollMondays('2026-11-18', 3);
+    assert.deepEqual(mondays, ['2026-11-16', '2026-11-23', '2026-11-30']);
+    assert.equal(defaultMonday, '2026-11-23');
+    assert.equal(enrollMondays('2026-11-16').defaultMonday, '2026-11-16');
+  });
+
+  it('counts whole weeks of pause', () => {
+    assert.equal(weeksPaused('2026-11-02', '2026-11-08'), 0);
+    assert.equal(weeksPaused('2026-11-02', '2026-11-18'), 2);
   });
 });

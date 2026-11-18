@@ -35,3 +35,14 @@ export function diffDays(from: string, to: string): number {
   const ms = parseCalendarDate(to).getTime() - parseCalendarDate(from).getTime();
   return Math.round(ms / 86_400_000);
 }
+
+/** First day of the month containing `date`, moved by `months`. */
+export function startOfMonth(date: string, months = 0): string {
+  const value = parseCalendarDate(date);
+  return toCalendarDate(new Date(value.getFullYear(), value.getMonth() + months, 1));
+}
+
+/** Last day of the month containing `date`. */
+export function endOfMonth(date: string): string {
+  return addDays(startOfMonth(date, 1), -1);
+}

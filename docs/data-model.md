@@ -199,7 +199,8 @@ Les dates réelles sont **matérialisées** à l'inscription : le dashboard et l
 | `scheduled_date` | date | `start_date + (week_index - 1) * 7 + (day_of_week - 1)` (+ décalages) |
 
 Règles :
-- **Décalage** : toujours en **semaines entières**. `UPDATE scheduled_date = scheduled_date + 7 * n` pour les lignes dont la date est `>=` au lundi de la semaine choisie et sans workout lié. Le passé et les séances déjà loguées ne bougent pas ; un mardi reste un mardi.
+- **Décalage** : toujours en **semaines entières**. `UPDATE scheduled_date = scheduled_date + 7 * n` pour les lignes sans workout lié dont la **semaine prévue** (`planned_session.week_index`) est `>=` à la semaine choisie. Les semaines précédentes et les séances déjà loguées ne bougent pas ; un mardi reste un mardi. La semaine affichée sur une séance (`Week 3 · Day 2`) vient de `week_index`, pas de la date, pour rester juste après un décalage.
+- **Arrêt** : l'inscription passe en `archived` et ses lignes sans workout datées d'aujourd'hui ou après sont supprimées (suppression douce).
 - **Programme modifié** : on régénère les lignes futures sans workout ; les séances déjà loguées gardent leur lien.
 - **Pause** : tant que l'inscription est `paused`, ses lignes sans workout dont la date est `>= paused_at` sont masquées (Today, Calendar, stats d'assiduité) et ne deviennent jamais `missed`. Rien n'est décalé automatiquement : à la reprise, l'athlète choisit le décalage (voir `screens.md`, S7).
 - **Statut** (dérivé, non stocké) : `in_progress` si un workout lié est commencé et non terminé, `done` si un workout lié est terminé ou contient au moins un exercice logué, `missed` si date passée sans workout, sinon `planned`. `in_progress` l'emporte sur `done`. Détail dans `screens.md` §3.2.
@@ -300,7 +301,7 @@ Une validation côté code (schéma Zod par `dosage_scheme`) garantit que les co
 | Seed | `src/db/seed/` : `catalog.ts` (muscles, équipement, exercices), `demo-program.ts` (coach factice et programme de démo) |
 | Contrôle du seed | `npm run check:seed` applique les migrations et le seed à une base SQLite en mémoire, clés étrangères et contraintes `CHECK` actives |
 | Requêtes | `src/db/queries/` ; les écrans les lisent avec `useDbQuery`, qui relance la lecture à chaque changement de la base |
-| Tests | `npm test` : logique pure (timer, calendrier, charges) et un parcours complet en base (onboarding, séance de test, référence, charges en %), sur une base SQLite en mémoire |
+| Tests | `npm test` : logique pure (timer, calendrier, charges) et un parcours complet en base (onboarding, séance de test, référence, charges en %, logs libres, inscriptions : décalage, pause, reprise, arrêt), sur une base SQLite en mémoire |
 
 Le seed est chargé au premier lancement, quand la table `exercise` est vide. À l'onboarding, les programmes du coach factice sont rattachés à l'athlète et inscrits avec, pour date de début, le lundi de la semaine en cours.
 

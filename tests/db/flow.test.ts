@@ -23,6 +23,15 @@ import {
   setPerformedOn,
   startWorkout,
 } from '../../src/db/queries/schedule';
+import {
+  enrollInProgram,
+  getProgramsOverview,
+  getShiftPlan,
+  pauseEnrollment,
+  resumeEnrollment,
+  shiftEnrollment,
+  stopEnrollment,
+} from '../../src/db/queries/enrollment';
 import { seedDatabase } from '../../src/db/seed';
 import { addClimbRow, buildPlannedRows, removeClimbRow } from '../../src/features/timer/rows';
 import { addDays, mondayOf, today } from '../../src/lib/dates';
@@ -203,5 +212,73 @@ describe('database flow', () => {
     assert.equal(getActiveWorkout(), null);
     // It can be logged again.
     assert.ok(ensureWorkout(session.scheduledSessionId!, false));
+  });
+});
+
+describe('enrollments', () => {
+  const range = () => getScheduledSessions({ from: addDays(monday, -7), to: addDays(monday, 90) });
+  const datesOfWeek = (week: number) =>
+    range()
+      .filter((session) => session.program?.week === week)
+      .map((session) => session.scheduledDate);
+
+  it('lists the coach program as active, in week 1 of 4', () => {
+    const { active, archived, mine } = getProgramsOverview();
+    assert.equal(active.length, 1);
+    assert.deepEqual([active[0].name, active[0].author, active[0].currentWeek, active[0].totalWeeks], [
+      'Finger strength block',
+      'Coach Alex',
+      1,
+      4,
+    ]);
+    assert.deepEqual([archived.length, mine.length], [0, 0]);
+    assert.throws(() => enrollInProgram(active[0].programId, monday, '#fff'), /Already enrolled/);
+  });
+
+  it('shifts unlogged sessions from a week on, keeping weekdays', () => {
+    const { enrollmentId } = getProgramsOverview().active[0];
+    const plan = getShiftPlan(enrollmentId)!;
+    assert.deepEqual([plan.fromWeek, plan.weeks, plan.weekStarts[1]], [1, 0, monday]);
+
+    const before = datesOfWeek(4);
+    shiftEnrollment(enrollmentId, 4, 2);
+    assert.deepEqual(datesOfWeek(4), before.map((date) => addDays(date, 14)));
+    // Week 1 holds a logged session: it never moves, even when shifting from week 1.
+    const week1 = datesOfWeek(1);
+    shiftEnrollment(enrollmentId, 1, -1);
+    assert.ok(datesOfWeek(1).includes(week1[0]));
+    assert.ok(datesOfWeek(1).includes(addDays(week1[1], -7)));
+    shiftEnrollment(enrollmentId, 1, 1);
+    assert.deepEqual(datesOfWeek(1), week1);
+  });
+
+  it('pauses, then resumes with the suggested shift', () => {
+    const { enrollmentId } = getProgramsOverview().active[0];
+    pauseEnrollment(enrollmentId);
+    let row = getProgramsOverview().active[0];
+    assert.deepEqual([row.status, row.pausedAt], ['paused', today()]);
+    // Unlogged sessions from today on are hidden while paused.
+    assert.ok(range().every((session) => session.scheduledDate < today() || session.workoutId != null));
+
+    const plan = getShiftPlan(enrollmentId)!;
+    assert.equal(plan.weeks, 0);
+    resumeEnrollment(enrollmentId, plan.fromWeek, 1);
+    row = getProgramsOverview().active[0];
+    assert.deepEqual([row.status, row.pausedAt], ['active', null]);
+  });
+
+  it('stops: upcoming unlogged sessions go, logged ones stay, and it can be followed again', () => {
+    const { enrollmentId, programId } = getProgramsOverview().active[0];
+    stopEnrollment(enrollmentId);
+    const overview = getProgramsOverview();
+    assert.deepEqual([overview.active.length, overview.archived.length], [0, 1]);
+    assert.ok(range().every((session) => session.workoutId != null));
+    assert.equal(getTodayData(today()).hasActiveProgram, false);
+
+    const next = addDays(monday, 7);
+    enrollInProgram(programId, next, '#9A7DD4');
+    const again = getProgramsOverview();
+    assert.deepEqual([again.active.length, again.archived.length, again.active[0].startDate], [1, 0, next]);
+    assert.throws(() => enrollInProgram(programId, addDays(next, 1), '#fff'), /not a Monday/);
   });
 });

@@ -73,3 +73,21 @@ export function formatCountdown(ms: number): string {
 export function formatDuration(seconds: number): string {
   return seconds < 60 ? `${seconds}s` : formatCountdown(seconds * 1000);
 }
+
+const monthFormat = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' });
+const dayMonthFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
+
+/** "November 2026". */
+export function formatMonth(date: string): string {
+  return monthFormat.format(new Date(`${date}T00:00:00`));
+}
+
+/** "16–22 Nov", or "30 Nov – 6 Dec" across two months. */
+export function formatWeekRange(from: string, to: string): string {
+  const start = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  if (start.getMonth() === end.getMonth()) {
+    return `${start.getDate()}–${dayMonthFormat.format(end)}`;
+  }
+  return `${dayMonthFormat.format(start)} – ${dayMonthFormat.format(end)}`;
+}

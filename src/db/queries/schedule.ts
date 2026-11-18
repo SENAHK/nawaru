@@ -1,7 +1,6 @@
 import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 
 import {
-  programWeekOf,
   resolveLoad,
   sessionStatus,
   type SessionStatus,
@@ -290,7 +289,8 @@ export function getScheduledSessions(filter: Filter): SessionSummary[] {
         name: row.program.name,
         color: row.enrollment.color,
         author: row.program.ownerId === athlete.id ? 'you' : row.author,
-        week: programWeekOf(row.enrollment.startDate, row.scheduled.scheduledDate),
+        // The planned week, which stays right after a shift (dates no longer tell it).
+        week: row.planned.weekIndex,
         day: row.planned.dayOfWeek,
       },
       items,
@@ -583,4 +583,9 @@ export function getActiveWorkout(): ActiveWorkout | null {
     title: row.workout.scheduledSessionId ? (row.name ?? 'Session') : 'Free session',
     startedAt: row.workout.startedAt,
   };
+}
+
+/** Planned sessions and free workouts between two dates, for the calendar. */
+export function getCalendarSessions(from: string, to: string): SessionSummary[] {
+  return [...getScheduledSessions({ from, to }), ...getFreeWorkouts({ from, to })];
 }

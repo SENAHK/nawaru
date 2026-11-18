@@ -96,7 +96,7 @@ Action : `Get started` crée le `user_profile`, inscrit l'athlète aux programme
 
 ### S2 Calendar
 
-**En-tête** : titre de la période (`12–18 Jan` ou `January 2026`), flèches précédent / suivant, bouton `Today`, SegmentedControl `Week` / `Month`.
+**En-tête** : titre de la période (`12–18 Jan` ou `January 2026`) et flèches précédent / suivant ; en dessous, SegmentedControl `Week` / `Month` et bouton `Today`.
 
 **Filtre** : rangée de `Chip` (un par programme actif, avec sa couleur) + `Free sessions`. Tous actifs par défaut.
 
@@ -104,7 +104,8 @@ Action : `Get started` crée le `user_profile`, inscrit l'athlète aux programme
 - Chaque ligne : jour (`Mon 12`), puis une ligne par séance (`ProgramDot`, nom, `Badge`), et les workouts libres (`Free session`).
 - Le jour courant est mis en évidence (fond `accentSubtle`).
 - Tap sur une séance : S3. Tap sur un jour vide : rien.
-- Glisser horizontalement : semaine précédente / suivante.
+- Glisser horizontalement : semaine précédente / suivante. **Pas encore fait** : les flèches de l'en-tête suffisent pour l'instant (Gesture Handler 3 a changé d'API et l'app n'a pas encore de `GestureHandlerRootView`).
+- Une séance loguée reste à sa date prévue ; un workout libre apparaît à sa date de réalisation.
 
 **Vue mois** : grille de 7 colonnes (L à D).
 - Chaque case : numéro du jour, et jusqu'à 3 pastilles (couleur du programme ; pastille pleine = faite, contour = prévue, gris = manquée) ; `+2` au-delà.
@@ -244,15 +245,15 @@ Trois sections :
 
 | Section | Contenu | Actions par ligne |
 | --- | --- | --- |
-| `Active` | Inscriptions actives : `ProgramDot`, nom, auteur (`by Coach Alex` ou `by you`), progression `Week 3 of 8`, barre de progression | Menu : `Shift weeks`, `Pause` (ou `Resume` si en pause, avec un badge `PAUSED`), `Stop` |
+| `Active` | Inscriptions actives : `ProgramDot`, nom, auteur (`by Coach Alex` ou `by you`), progression `Week 3 of 8` (semaine prévue de la dernière séance passée, donc juste après un décalage ; `Starts Mon 23 Nov` avant le début), barre de progression | Bouton `…` : feuille d'actions native `Shift weeks`, `Pause` (ou `Resume` si en pause, avec un badge `PAUSED`), `Stop` (confirmé) |
 | `My programs` | Programmes dont je suis l'auteur, sans inscription active | `Enroll`, `Edit`, `Duplicate`, `Delete` |
 | `Archived` | Inscriptions arrêtées ou terminées (repliée) | `Enroll again` |
 
-Bouton principal : `New program` (ouvre S9 sur un programme vide d'une semaine).
+Bouton principal : `New program` (ouvre S9 sur un programme vide d'une semaine). Il arrive avec l'éditeur de programme, comme `Edit`, `Duplicate` et `Delete` dans `My programs`, et l'ouverture de S8 au tap sur une ligne.
 
-**EnrollSheet** : sélecteur de date limité aux lundis (le lundi qui vient par défaut, la semaine en cours autorisée), choix de la couleur (`ProgramDot`), bouton `Enroll`. Il crée l'`enrollment` et ses `scheduled_session`.
+**EnrollSheet** : pastilles des 9 prochains lundis (`This week · Mon 16 Nov`, puis les suivants ; le lundi qui vient par défaut, ou aujourd'hui si on est lundi), choix de la couleur (la première non utilisée par défaut), bouton `Enroll`. Il crée l'`enrollment` et ses `scheduled_session`. Une seule inscription active ou en pause par programme.
 
-**ShiftSheet** : `From week` (sélecteur, défaut = semaine en cours), `Shift by` (Stepper, de −4 à +8 semaines), aperçu `Week 4 will start on Mon 2 Feb`, bouton `Shift`. Les séances déjà loguées ne bougent pas.
+**ShiftSheet** : `From week` (pastilles des semaines du programme, défaut = semaine en cours), `Shift by` (Stepper, de −4 à +8 semaines), aperçu `Week 4 will start on Mon 2 Feb`, bouton `Shift`. Toutes les séances non loguées de cette semaine et des suivantes bougent, y compris celles déjà passées (c'est ce qui permet de rattraper une pause) ; les séances déjà loguées ne bougent pas.
 
 **Pause / Resume** : `Pause` garde l'inscription et enregistre `paused_at` = aujourd'hui. Les séances non loguées à partir de cette date sont masquées dans Today et Calendar, ne passent jamais en `missed` et ne comptent pas dans l'assiduité. `Resume` ouvre la `ShiftSheet` pré-remplie : `From week` = semaine de la mise en pause, `Shift by` = nombre de semaines entières écoulées depuis (sans le plafond de +8). L'athlète peut ajuster ; avec 0, le programme reprend à sa place et les séances sautées pendant la pause apparaissent `missed`.
 

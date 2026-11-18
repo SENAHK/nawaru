@@ -82,3 +82,18 @@ function none(lastKg: number | null): ResolvedLoad {
     ? { kg: null, label: '' }
     : { kg: lastKg, label: `${formatAddedLoad(lastKg)} · last` };
 }
+
+/** Weeks to shift by when resuming: whole weeks elapsed since the pause. */
+export function weeksPaused(pausedAt: string, today: string): number {
+  return Math.max(0, Math.floor(diffDays(pausedAt, today) / 7));
+}
+
+/**
+ * Start dates offered when enrolling: this week's Monday, then the next ones.
+ * The default is the coming Monday (docs/screens.md, EnrollSheet).
+ */
+export function enrollMondays(today: string, count = 9): { mondays: string[]; defaultMonday: string } {
+  const monday = addDays(today, 1 - isoWeekday(today));
+  const mondays = Array.from({ length: count }, (_, week) => addDays(monday, week * 7));
+  return { mondays, defaultMonday: today === monday ? monday : mondays[1] };
+}
