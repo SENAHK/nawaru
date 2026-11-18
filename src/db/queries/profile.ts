@@ -80,3 +80,24 @@ export function completeOnboarding(values: OnboardingValues): void {
     });
   });
 }
+
+export type ProfileSettings = Pick<
+  typeof userProfile.$inferInsert,
+  | 'displayName'
+  | 'bodyweightKg'
+  | 'weightUnit'
+  | 'boulderGradeSystem'
+  | 'routeGradeSystem'
+  | 'theme'
+  | 'prepCountdownS'
+  | 'sideSwitchRestS'
+  | 'timerVolume'
+  | 'timerSoundsEnabled'
+  | 'hapticsEnabled'
+>;
+
+/** Saves settings of the athlete (docs/screens.md S13). */
+export function updateProfile(values: Partial<ProfileSettings>): void {
+  const athlete = requireAthlete();
+  db.update(userProfile).set(values).where(eq(userProfile.id, athlete.id)).run();
+}

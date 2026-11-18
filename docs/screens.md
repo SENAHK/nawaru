@@ -363,14 +363,18 @@ Les graphiques sont dessinés avec `react-native-svg` (courbe) et des vues (barr
 
 | Section | Réglages |
 | --- | --- |
-| Profile | Name, Bodyweight (facultatif) |
-| Units | Weight `kg` / `lbs`, Boulder grades, Route grades |
-| Appearance | Theme `Dark` / `Light` / `System` (défaut `Dark`) |
-| Timer | Get ready countdown (5 à 30 s, défaut 10), Side switch rest (5 à 30 s, défaut 10), Sound volume (curseur), Sounds on/off, Haptics on/off |
+| Profile | Name (enregistré à la fin de la saisie), Bodyweight (facultatif, Stepper 0.5 kg, bouton `Clear bodyweight`) |
+| Units | Weight `kg` / `lbs`, Boulder grades, Route grades. Avec `lbs`, l'aide `Loads still show in kg for now` rappelle que la conversion n'est pas encore faite |
+| Appearance | Theme `Dark` / `Light` / `System` (défaut `Dark`), appliqué immédiatement. Il force aussi le style d'interface iOS de l'app (`Appearance.setColorScheme`), pour que la barre d'onglets, les alertes, les sélecteurs et les feuilles natives suivent le thème choisi et non celui du téléphone |
+| Timer | Get ready countdown (5 à 30 s, défaut 10), Side switch rest (5 à 30 s, défaut 10), Sounds on/off, Sound volume (curseur par pas de 5 %, enregistré 300 ms après le dernier mouvement), Haptics on/off. Les réglages s'appliquent au prochain exercice ouvert |
 | Data | `Export backup` (fichier JSON de toutes les données via la feuille de partage iOS), `Import backup` (remplace les données après confirmation) |
-| About | Version |
+| About | Version (`expo.version` de `app.json`) |
 
-> **Ajout recommandé** : comme la V1 est 100 % locale, l'export / import JSON est la seule protection contre la perte du téléphone. C'est un petit effort et il faut le garder dans la V1.
+Chaque réglage est enregistré dès qu'il change, dans `user_profile`. Interrupteurs et curseur sont les contrôles natifs de `@expo/ui`, teintés avec l'accent.
+
+**Sauvegarde** (`src/db/backup.ts`) : l'export écrit `nawaru-backup-AAAA-MM-JJ.json` (toutes les tables sauf `active_timer`, avec le nombre de migrations appliquées) et ouvre la feuille de partage (`expo-sharing`) : `Save to Files`, AirDrop, mail… L'import passe par le sélecteur de documents (`expo-document-picker`), vérifie le fichier (application, format, version de schéma pas plus récente, tables et colonnes connues) puis demande `Replace all data?` avec le nom du fichier, sa date et le nombre de lignes. Le remplacement se fait en une transaction, clés étrangères vérifiées à la fin : au moindre problème, rien ne change. Un timer en cours est fermé.
+
+> Comme la V1 est 100 % locale, l'export / import JSON est la seule protection contre la perte du téléphone.
 
 ## 3. Règles transverses
 

@@ -67,9 +67,13 @@ function RootNavigator() {
   // the screen coming into view reflects changes made elsewhere.
   const pathname = usePathname();
   useEffect(() => refreshDbQueries(), [pathname]);
-  const { colors, scheme } = useTheme();
+  const { colors, scheme, setPreference } = useTheme();
   // Until the athlete profile exists, onboarding is the only reachable screen.
   const onboarded = useDbQuery(() => getAthlete() != null, 'athlete');
+  // The theme preference lives in the profile; the provider sits above the
+  // database gate, so it is synced from here.
+  const theme = useDbQuery(() => getAthlete()?.theme ?? 'dark', 'theme');
+  useEffect(() => setPreference(theme), [theme, setPreference]);
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
   const navigationTheme = {
     ...base,

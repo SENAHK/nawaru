@@ -40,6 +40,8 @@ import {
   getHangSeries,
   getLastLoggedExercise,
 } from '../../src/db/queries/progress';
+import { BackupError, exportBackup, importBackup, validateBackup } from '../../src/db/backup';
+import { updateProfile } from '../../src/db/queries/profile';
 import { seedDatabase } from '../../src/db/seed';
 import { addClimbRow, buildPlannedRows, removeClimbRow } from '../../src/features/timer/rows';
 import { addDays, mondayOf, today } from '../../src/lib/dates';
@@ -53,6 +55,11 @@ before(() => {
       if (statement.trim()) db.run(statement);
     }
   }
+  // What drizzle's migrator records; the backup reads it as the schema version.
+  db.run('CREATE TABLE __drizzle_migrations (id integer PRIMARY KEY, hash text NOT NULL, created_at numeric)');
+  readdirSync(dir)
+    .filter((name) => name.endsWith('.sql'))
+    .forEach((name, index) => db.run(`INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('${name}', ${index})`));
   db.run('PRAGMA foreign_keys = ON');
   seedDatabase(db);
 });
@@ -335,5 +342,53 @@ describe('progress', () => {
     const sessions = getConsistencySessions(today());
     assert.ok(sessions.length > 0);
     assert.ok(sessions.every((session) => session.scheduledDate <= addDays(mondayOf(today()), 6)));
+  });
+});
+
+describe('settings and backup', () => {
+  it('saves profile settings', () => {
+    updateProfile({ bodyweightKg: 68.5, theme: 'light', timerVolume: 40 });
+    const athlete = getAthlete()!;
+    assert.deepEqual([athlete.bodyweightKg, athlete.theme, athlete.timerVolume], [68.5, 'light', 40]);
+  });
+
+  it('exports every table and imports it back exactly', () => {
+    const backup = JSON.parse(JSON.stringify(exportBackup(new Date('2026-11-18T10:00:00Z'))));
+    assert.equal(backup.app, 'nawaru');
+    assert.ok(!('active_timer' in backup.tables) && !('__drizzle_migrations' in backup.tables));
+    const counts = Object.fromEntries(
+      Object.entries(backup.tables as Record<string, unknown[]>).map(([name, rows]) => [name, rows.length]),
+    );
+    assert.ok(counts.exercise === 25 && counts.set_log > 0);
+
+    // Changes after the export are rolled back by the import.
+    updateProfile({ displayName: 'Changed' });
+    toggleFavorite(getLibrary()[1].id);
+    importBackup(backup);
+
+    assert.equal(getAthlete()?.displayName, 'Mike');
+    assert.deepEqual(JSON.parse(JSON.stringify(exportBackup(new Date('2026-11-18T10:00:00Z')))), backup);
+  });
+
+  it('refuses files that are not a backup, without touching the data', () => {
+    assert.throws(() => validateBackup({ hello: 'world' }), BackupError);
+    assert.throws(() => validateBackup({ app: 'nawaru', format: 1, schemaVersion: 99, tables: {} }), /newer version/);
+    assert.throws(
+      () => importBackup({ app: 'nawaru', format: 1, schemaVersion: 1, tables: { nope: [] } }),
+      /Unknown table/,
+    );
+    assert.throws(
+      () => importBackup({ app: 'nawaru', format: 1, schemaVersion: 1, tables: { exercise: [{ bogus: 1 }] } }),
+      /Unknown column/,
+    );
+    assert.equal(getLibrary().length, 25);
+  });
+
+  it('rolls back an import that breaks a foreign key', () => {
+    const backup = JSON.parse(JSON.stringify(exportBackup()));
+    const broken = structuredClone(backup);
+    broken.tables.set_log = [{ ...broken.tables.set_log[0], exercise_log_id: 'missing' }];
+    assert.throws(() => importBackup(broken));
+    assert.deepEqual(JSON.parse(JSON.stringify(exportBackup(new Date(backup.exportedAt)))), backup);
   });
 });
